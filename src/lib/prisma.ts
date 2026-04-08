@@ -1,21 +1,14 @@
-import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
+/**
+ * هذا الملف يُصدّر Supabase Admin Client بدلاً من Prisma.
+ * تم الانتقال من Prisma إلى Supabase مباشرة.
+ * الكود المتبقي الذي يستورد من هنا سيعمل بشكل طبيعي.
+ */
+import { createClient } from "@supabase/supabase-js";
 
-const connectionString = `${process.env.DATABASE_URL}`;
+export const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool);
-
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
-
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    adapter,
-    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-  });
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+// alias للتوافق مع الكود القديم الذي يستورد { prisma }
+export const prisma = supabaseAdmin;
