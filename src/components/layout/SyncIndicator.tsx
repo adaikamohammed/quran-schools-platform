@@ -58,7 +58,7 @@ export default function SyncIndicator() {
     },
   };
 
-  const current = config[syncStatus.state];
+  const current = config[syncStatus.state as keyof typeof config] || config.idle;
   const Icon = current.icon;
   const isSpinning = syncStatus.state === "syncing" || manualSyncing;
 

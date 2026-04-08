@@ -375,7 +375,7 @@ export default function QuranPage() {
   // ─── بيانات الطالب المختار ───────────────────────────────
 
   const selectedStudent = students.find((s) => s.id === selectedStudentId);
-  const selectedProgress = selectedStudentId ? (progressMap.get(selectedStudentId) ?? new Map()) : new Map<number, SurahStatus>();
+  const selectedProgress: Map<number, SurahStatus> = selectedStudentId ? (progressMap.get(selectedStudentId) ?? new Map<number, SurahStatus>()) : new Map<number, SurahStatus>();
 
   // ─── إحصائيات الطالب المختار ─────────────────────────────
 
@@ -638,7 +638,9 @@ export default function QuranPage() {
               >
                 <AnimatePresence mode="popLayout">
                   {filteredSurahs.map((surah) => {
-                    const status = selectedProgress.get(surah.id) ?? "غير محفوظة";
+                    const status = (selectedProgress.get(surah.id) ?? "غير محفوظة") as SurahStatus;
+                    const sConfig = STATUS_CONFIG[status];
+                    const Icon = sConfig.icon;
                     return (
                       <motion.div
                         key={surah.id}
@@ -660,22 +662,19 @@ export default function QuranPage() {
                           <button
                             onClick={() => setSelectedSurah(surah)}
                             className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all hover:shadow-sm ${
-                              STATUS_CONFIG[status].bg
-                            } ${STATUS_CONFIG[status].border}`}
+                              sConfig.bg
+                            } ${sConfig.border}`}
                           >
-                            <span className={`text-xs font-black w-6 text-center ${STATUS_CONFIG[status].color}`}>
+                            <span className={`text-xs font-black w-6 text-center ${sConfig.color}`}>
                               {surah.id}
                             </span>
                             <div className="flex-1 text-right">
-                              <p className={`text-sm font-black ${STATUS_CONFIG[status].color}`} style={{ fontFamily: "var(--font-headline)" }}>
+                              <p className={`text-sm font-black ${sConfig.color}`} style={{ fontFamily: "var(--font-headline)" }}>
                                 {surah.name}
                               </p>
-                              <p className={`text-xs opacity-60 ${STATUS_CONFIG[status].color}`}>{surah.verses} آية</p>
+                              <p className={`text-xs opacity-60 ${sConfig.color}`}>{surah.verses} آية</p>
                             </div>
-                            {(() => {
-                              const Icon = STATUS_CONFIG[status].icon;
-                              return <Icon className={`w-4 h-4 ${STATUS_CONFIG[status].color}`} />;
-                            })()}
+                            <Icon className={`w-4 h-4 ${sConfig.color}`} />
                           </button>
                         )}
                       </motion.div>

@@ -101,7 +101,7 @@ export async function createOrUpdateSurahProgress(
     createdAt: existing?.createdAt ?? '',
     updatedAt: '',
   };
-  return saveAndQueue('surahProgress', action, progress, saveSurahProgress);
+  return saveAndQueue('surah_progress', action, progress, saveSurahProgress);
 }
 
 // ─── الاشتراكات ───────────────────────────────────────
@@ -130,7 +130,7 @@ export async function updatePaymentStatus(
 // ─── التسجيلات ────────────────────────────────────────
 
 export async function createRegistration(
-  data: Omit<PreRegistration, 'id' | 'createdAt' | 'updatedAt'>
+  data: Omit<PreRegistration, 'id' | 'createdAt' | 'updatedAt' | 'requestedAt'>
 ): Promise<PreRegistration> {
   const reg: PreRegistration = {
     ...data,
