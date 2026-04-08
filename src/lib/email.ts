@@ -1,6 +1,11 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy getter — avoids top-level instantiation at build time
+// when RESEND_API_KEY may not be present in the build environment.
+function getResend(): Resend {
+  return new Resend(process.env.RESEND_API_KEY ?? 'placeholder');
+}
+
 const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL ?? 'admin@quran.com';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://quran-schools.vercel.app';
 
@@ -17,7 +22,7 @@ export async function sendNewSchoolNotification(school: {
   phone?: string;
 }): Promise<boolean> {
   try {
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from: 'منصة المدارس القرآنية <onboarding@resend.dev>',
       to: ADMIN_EMAIL,
       subject: `🆕 مدرسة جديدة انضمت: ${school.name}`,
@@ -70,7 +75,7 @@ export async function sendNewSchoolNotification(school: {
  */
 export async function sendWelcomeEmail(to: string, name: string, schoolName: string): Promise<boolean> {
   try {
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from: 'منصة المدارس القرآنية <onboarding@resend.dev>',
       to,
       subject: `🎉 أهلاً بمدرستك في منصتنا — ${schoolName}`,
