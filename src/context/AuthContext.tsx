@@ -1,176 +1,149 @@
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from "react";
-import { getDB } from "@/lib/storage/db";
-import { startSyncEngine, stopSyncEngine, subscribeSyncStatus } from "@/lib/storage/syncEngine";
-import type { SyncStatus } from "@/lib/storage/syncEngine";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createClient } from "@/lib/supabase/client";
 import type { AppUser, School } from "@/lib/types";
 
-// ─── نوع السياق ──────────────────────────────────────────
-
+// Types compatible with existing app expectations
 interface AuthContextType {
-  user: AppUser | null;
-  school: School | null;
+  user: any | null; // using any for quick migration
+  school: any | null;
   loading: boolean;
-  role: AppUser["role"] | null;
+  role: string | null;
   isSuperAdmin: boolean;
   isPrincipal: boolean;
   isTeacher: boolean;
-  syncStatus: SyncStatus;
+  syncStatus: any; 
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// ─── مخزن الجلسة المحلية ─────────────────────────────────
-
-const SESSION_KEY = "qsp_session"; // quran-schools-platform session
-
-function loadSession(): { userId: string; schoolId: string } | null {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveSession(userId: string, schoolId: string): void {
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ userId, schoolId }));
-}
-
-function clearSession(): void {
-  localStorage.removeItem(SESSION_KEY);
-}
-
-// ─── Provider ─────────────────────────────────────────────
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AppUser | null>(null);
-  const [school, setSchool] = useState<School | null>(null);
+  const [user, setUser] = useState<any | null>(null);
+  const [school, setSchool] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>({
-    state: "idle",
-    lastSyncAt: null,
-    pendingCount: 0,
-  });
-
-  // ─── تحميل الجلسة عند البدء ────────────────────────────
+  const supabase = createClient();
 
   useEffect(() => {
-    async function restoreSession() {
+    let mounted = true;
+
+    async function loadSession() {
       try {
-        const res = await fetch("/api/auth/me");
-        if (res.ok) {
-          const data = await res.json();
-          const db = getDB();
-          const savedUser = await db.users.get(data.user.id);
-          const savedSchool = await db.schools.get(data.user.schoolId);
-          
-          if (savedUser && savedSchool) {
-            setUser(savedUser);
-            setSchool(savedSchool);
-          } else {
-            // First time on this device or local DB cleared
-            setUser(data.user);
-            saveSession(data.user.id, data.user.schoolId);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          if (mounted) {
+            setUser(null);
+            setSchool(null);
+            setLoading(false);
           }
-        } else if (res.status === 401) {
-          // Token expired or invalid
-          clearSession();
-          setUser(null);
-          setSchool(null);
-        } else {
-          fallbackToLocalSession();
+          return;
         }
-      } catch (err) {
-        // Network error (Offline mode)
-        fallbackToLocalSession();
+
+        const { data: userData } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
+
+        if (userData) {
+          const formattedUser = {
+            id: userData.id,
+            email: userData.email,
+            displayName: userData.display_name,
+            role: userData.role,
+            schoolId: userData.school_id,
+            groupName: userData.group_name,
+          };
+          if (mounted) setUser(formattedUser);
+
+          if (userData.school_id) {
+            const { data: schoolData } = await supabase
+              .from("schools")
+              .select("*")
+              .eq("id", userData.school_id)
+              .single();
+            if (mounted) setSchool(schoolData);
+          }
+        } else {
+          if (mounted) setUser(null);
+        }
+      } catch (e) {
+        console.error("Auth session load failed:", e);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     }
 
-    async function fallbackToLocalSession() {
-      const session = loadSession();
-      if (!session) return;
-      const db = getDB();
-      const savedUser = await db.users.get(session.userId);
-      const savedSchool = await db.schools.get(session.schoolId);
-      if (savedUser && savedSchool) {
-        setUser(savedUser);
-        setSchool(savedSchool);
+    loadSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (!session) {
+          if (mounted) {
+            setUser(null);
+            setSchool(null);
+          }
+        } else {
+          loadSession();
+        }
       }
-    }
-
-    restoreSession();
-  }, []);
-
-  // ─── تشغيل محرك المزامنة عند تسجيل الدخول ─────────────
-
-  useEffect(() => {
-    if (!user) return;
-
-    startSyncEngine();
-    const unsub = subscribeSyncStatus(setSyncStatus);
+    );
 
     return () => {
-      unsub();
-      stopSyncEngine();
+      mounted = false;
+      subscription.unsubscribe();
     };
-  }, [user?.id]);
+  }, [supabase]);
 
-  // ─── تسجيل الدخول ────────────────────────────────────
-
-  const login = async (email: string, password: string): Promise<void> => {
+  const login = async (email: string, pass: string): Promise<void> => {
+    // Calling the API route so it sets SSR cookies correctly
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password: pass }),
     });
 
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err.error || "تأكد من بيانات الدخول وحاول مجدداً.");
+      throw new Error(err.error || "خطأ في تسجيل الدخول");
     }
 
-    const data = await res.json();
-    const db = getDB();
-    
-    saveSession(data.user.id, data.user.schoolId);
-    setUser(data.user);
-
-    const foundSchool = await db.schools.get(data.user.schoolId);
-    if (foundSchool) {
-      setSchool(foundSchool);
+    // Refresh data natively
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      const { data: userData } = await supabase.from("users").select("*").eq("id", session.user.id).single();
+      if (userData) {
+        setUser({
+          id: userData.id,
+          email: userData.email,
+          displayName: userData.display_name,
+          role: userData.role,
+          schoolId: userData.school_id,
+        });
+        if (userData.school_id) {
+          const { data: schoolData } = await supabase.from("schools").select("*").eq("id", userData.school_id).single();
+          setSchool(schoolData);
+        }
+      }
     }
   };
-
-  // ─── تسجيل الخروج ────────────────────────────────────
 
   const logout = (): void => {
-    stopSyncEngine();
+    supabase.auth.signOut();
+    fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     setUser(null);
     setSchool(null);
-    clearSession();
-    
-    // Clear HttpOnly cookie on server
-    fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
   };
-
-  // ─── الصلاحيات ───────────────────────────────────────
 
   const role = user?.role ?? null;
   const isSuperAdmin = role === "super_admin";
   const isPrincipal = role === "principal" || role === "super_admin";
   const isTeacher = role === "teacher" || isPrincipal;
+
+  // Fake sync status to prevent breaking existing UI components relying on it
+  const syncStatus = { state: "idle", pendingCount: 0, lastSyncAt: new Date().toISOString() };
 
   return (
     <AuthContext.Provider
@@ -191,8 +164,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </AuthContext.Provider>
   );
 }
-
-// ─── Hook ─────────────────────────────────────────────────
 
 export function useAuth(): AuthContextType {
   const ctx = useContext(AuthContext);

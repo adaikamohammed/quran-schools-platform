@@ -6,6 +6,7 @@ import { getStudentsBySchool } from "@/lib/storage/db";
 import type { Student } from "@/lib/types";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { HintBulb } from "@/components/layout/HintBulb";
 import {
   Users,
   BookCheck,
@@ -44,7 +45,7 @@ function StatCard({
     >
       <Link
         href={href}
-        className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-[var(--color-border)] hover:shadow-lg hover:border-[var(--color-primary)]/20 transition-all duration-300 group"
+        className={`flex items-center gap-4 p-5 bg-white rounded-2xl border border-[var(--color-border)] hover:shadow-lg hover:border-[var(--color-primary)]/20 transition-all duration-300 group tour-step-${label === "طالب نشط" ? "students" : label === "سور مكتملة (المجموع)" ? "covenants" : ""}`}
       >
         <div className={`w-12 h-12 rounded-2xl ${color} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
           <Icon className="w-6 h-6 text-white" />
@@ -164,7 +165,7 @@ export default function DashboardPage() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-l from-[var(--color-primary)] to-[var(--color-primary-dark)] rounded-3xl p-6 text-white relative overflow-hidden"
+        className="tour-step-dashboard-welcome bg-gradient-to-l from-[var(--color-primary)] to-[var(--color-primary-dark)] rounded-3xl p-6 text-white relative overflow-hidden"
       >
         <div className="absolute inset-0 islamic-pattern opacity-10" />
         <div className="relative z-10">
@@ -186,10 +187,18 @@ export default function DashboardPage() {
       {/* Stats Grid */}
       <div>
         <h3
-          className="text-sm font-black text-gray-500 uppercase tracking-wider mb-4"
+          className="text-sm font-black text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2"
           style={{ fontFamily: "var(--font-headline)" }}
         >
           نظرة سريعة
+          <HintBulb 
+            size="sm"
+            label="تفاصيل عن الإحصائيات"
+            steps={[
+              { title: "الإحصائيات السريعة", description: "هنا نجمع لك أهم أرقام مدرستك وحلقاتك لتكون أمام عينيك دائماً." },
+              { title: "التحديث التلقائي", description: "يتم تحديث هذه الإحصائيات فورياً بمجرد إضافة طالب جديد، أو تسجيل غياب، أو اكتمال حفظ سورة." }
+            ]} 
+          />
         </h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat, i) => (
@@ -216,7 +225,7 @@ export default function DashboardPage() {
             >
               <Link
                 href={action.href}
-                className="flex flex-col items-center text-center p-5 bg-white rounded-2xl border border-[var(--color-border)] hover:shadow-lg hover:border-[var(--color-primary)]/20 transition-all duration-300 group h-full"
+                className={`flex flex-col items-center text-center p-5 bg-white rounded-2xl border border-[var(--color-border)] hover:shadow-lg hover:border-[var(--color-primary)]/20 transition-all duration-300 group h-full ${action.label === "التقرير اليومي" ? "tour-step-points" : ""}`}
               >
                 <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${action.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-md`}>
                   <action.icon className="w-6 h-6 text-white" />

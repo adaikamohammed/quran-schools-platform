@@ -121,6 +121,21 @@ function StudentRow({ student, record, onChange, sessionSurahId }: StudentRowPro
           ))}
         </div>
 
+        {/* زر إشعار الغياب عبر واتساب */}
+        {isAbsent && student.phone1 && (
+          <a
+            href={`https://wa.me/${student.phone1.replace(/\D/g, "")}?text=${encodeURIComponent(
+              `السلام عليكم ورحمة الله،\n\nنُعلمكم بغياب ابنكم/ابنتكم *${student.fullName}* عن الحصة اليوم ${new Date().toLocaleDateString("ar-DZ", { weekday: "long", day: "numeric", month: "long" })}.\n\nنرجو التواصل معنا إن كان هناك عذر.\nجزاكم الله خيراً 🌿`
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="📱 إرسال إشعار غياب للولي عبر واتساب"
+            className="w-8 h-8 rounded-xl bg-emerald-100 hover:bg-emerald-200 flex items-center justify-center text-emerald-700 transition-colors shrink-0"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+          </a>
+        )}
+
         {/* زر التوسع */}
         <button
           onClick={() => setExpanded((v) => !v)}

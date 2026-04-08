@@ -10,7 +10,7 @@ import {
   DollarSign, CheckCircle2, Clock, Shield,
   Search, Plus, X, Loader2, User,
   AlertTriangle, CreditCard, TrendingUp, Filter,
-  ChevronDown, Wallet, Check,
+  ChevronDown, Wallet, Check, Info,
 } from "lucide-react";
 
 // ─── فترات الاشتراك ──────────────────────────────────────
@@ -152,6 +152,20 @@ export default function DuesPage() {
         <h1 className="text-2xl font-black text-gray-900" style={{ fontFamily: "var(--font-headline)" }}>الاشتراكات الفصلية</h1>
         <p className="text-xs text-gray-400 font-medium mt-0.5">{students.length} طالب · {stats.paid} مدفوع</p>
       </div>
+
+      {/* ─── ملاحظة توضيحية لأي مدرسة جديدة ─── */}
+      <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-2xl text-sm">
+        <Info className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+        <div>
+          <p className="font-bold text-blue-800 mb-1">توضيح نظام الاشتراكات</p>
+          <p className="text-blue-700 text-xs leading-relaxed">
+            <strong>فئة الأصاغر</strong> و<strong>فئة الأكابر</strong> هما فئتان للتسعير يختار مدير كل مدرسة أسماءهما وأسعارهما.
+            مثلاً: الأصاغر = بسعر أقل، والأكابر = بسعر أعلى. <br />
+            <strong>لضبط أسعار الاشتراكات:</strong> اذهب إلى إعدادات المدرسة (⚙️) وحدد ثمن كل فئة.
+          </p>
+        </div>
+      </div>
+
 
       {/* إحصائيات */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

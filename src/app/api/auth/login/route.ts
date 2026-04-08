@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { signToken, setAuthCookie } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
   try {
@@ -10,39 +9,45 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'البريد الإلكتروني وكلمة المرور مطلوبان' }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const supabase = await createClient();
+
+    // Sign in using Supabase native Auth (to get session cookies correctly set)
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
 
-    if (!user || user.deletedAt || !user.isActive) {
+    if (authError || !authData.user) {
+      console.error("Auth error from Supabase:", authError);
       return NextResponse.json({ error: 'بيانات الدخول غير صحيحة أو الحساب غير نشط' }, { status: 401 });
     }
 
-    // Since we're migrating and locally it might be plain text or a simple hash
-    // We'll compare it here. In a real app we'd use bcrypt.
-    const isValid = user.passwordHash === password;
+    console.log("Supabase Auth Success, User ID:", authData.user.id);
 
-    if (!isValid) {
-      return NextResponse.json({ error: 'بيانات الدخول غير صحيحة' }, { status: 401 });
+    // Fetch the enriched user profile from our public tables
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id, email, display_name, role, school_id, group_name, is_active')
+      .eq('id', authData.user.id)
+      .single();
+
+    if (userError || !userData || !userData.is_active) {
+      console.error("User fetch error or inactive:", userError, userData);
+      // حظر الدخول لو الحساب مجمد في قاعدتنا
+      await supabase.auth.signOut();
+      return NextResponse.json({ error: 'الحساب غير نشط أو لا يملك صلاحيات' }, { status: 401 });
     }
 
-    const payload = {
-      userId: user.id,
-      role: user.role,
-      schoolId: user.schoolId,
-    };
-
-    const token = await signToken(payload);
-    await setAuthCookie(token);
+    console.log("Login Success fully completed for:", userData.email);
 
     return NextResponse.json({
       user: {
-        id: user.id,
-        email: user.email,
-        displayName: user.displayName,
-        role: user.role,
-        schoolId: user.schoolId,
-        groupName: user.groupName, // for teachers
+        id: userData.id,
+        email: userData.email,
+        displayName: userData.display_name,
+        role: userData.role,
+        schoolId: userData.school_id,
+        groupName: userData.group_name,
       },
     });
   } catch (error) {

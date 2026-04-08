@@ -19,6 +19,7 @@ import {
   Star,
   TargetIcon,
   Users2,
+  Printer,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -156,13 +157,23 @@ export default function StudentProfilePage() {
                   {student.groupName} · {student.subscriptionTier}
                 </p>
               </div>
-              <Link
-                href={`/app/students`}
-                className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center hover:bg-white/25 transition-colors"
-                title="تعديل"
-              >
-                <Edit className="w-4 h-4" />
-              </Link>
+              <div className="flex gap-2">
+                <Link
+                  href={`/app/students/${student.id}/report`}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 transition-colors text-xs font-bold text-white"
+                  title="طباعة تقرير الأداء"
+                >
+                  <Printer className="w-4 h-4" />
+                  تقرير
+                </Link>
+                <Link
+                  href={`/app/students`}
+                  className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center hover:bg-white/25 transition-colors"
+                  title="تعديل"
+                >
+                  <Edit className="w-4 h-4" />
+                </Link>
+              </div>
             </div>
 
             {/* Badges */}

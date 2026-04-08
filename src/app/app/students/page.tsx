@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getDB, getStudentsBySchool, getStudentsByTeacher } from "@/lib/storage/db";
 import { createStudent, updateStudent, softDeleteStudent } from "@/lib/storage/mutations";
@@ -10,7 +10,7 @@ import {
   Users, Plus, Search, Filter, X, ChevronDown,
   Phone, BookOpen, Calendar, UserCheck, UserX,
   MoreVertical, Edit, Trash2, Eye, Check,
-  ArrowUpDown, Download,
+  ArrowUpDown, Download, Share2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -439,18 +439,36 @@ function StudentCard({
         </div>
       </div>
 
-      {/* Contact */}
-      <div className="flex items-center justify-between">
+      {/* Contact + رابط الولي */}
+      <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 text-gray-400 text-xs">
           <Phone className="w-3 h-3" />
-          <span dir="ltr" className="font-mono">{student.phone1}</span>
+          <span dir="ltr" className="font-mono truncate max-w-[90px]">{student.phone1}</span>
         </div>
-        <Link
-          href={`/app/students/${student.id}`}
-          className="text-xs font-bold text-[var(--color-primary)] hover:underline flex items-center gap-1"
-        >
-          الملف الكامل
-        </Link>
+        <div className="flex items-center gap-2">
+          {/*
+            زر نسخ رابط ولي الأمر — أرسله عبر واتساب للولي
+            الرابط: /student/[id] — لا يحتاج حساباً، التحقق برقم الهاتف
+          */}
+          <button
+            onClick={() => {
+              const url = `${window.location.origin}/student/${student.id}`;
+              navigator.clipboard.writeText(url)
+                .then(() => alert(`✅ تم نسخ رابط المتابعة!\n\nأرسله للولي عبر واتساب:\n${url}`))
+                .catch(() => alert(`رابط الولي:\n${window.location.origin}/student/${student.id}`));
+            }}
+            title="نسخ رابط متابعة الطالب لولي الأمر"
+            className="w-7 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center text-emerald-600 transition-colors"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+          </button>
+          <Link
+            href={`/app/students/${student.id}`}
+            className="text-xs font-bold text-[var(--color-primary)] hover:underline flex items-center gap-1"
+          >
+            الملف
+          </Link>
+        </div>
       </div>
     </motion.div>
   );

@@ -2,38 +2,35 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { getDB } from "@/lib/storage/db";
-import type { School, AppUser } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Building2, Plus, Search, Edit, Trash2, X, AlertTriangle, CheckCircle2,
-  Shield, Key, UserCog, Mail, Phone, MapPin
+  UserCog, Mail
 } from "lucide-react";
-import { v4 as uuid } from "uuid";
+
+const supabase = createClient();
 
 // ─── Modal إضافة/تعديل مدرسة ────────────────────────────
-
 function SchoolModal({
   school,
   principal,
   onSave,
   onClose,
 }: {
-  school?: School;
-  principal?: AppUser;
-  onSave: (s: Partial<School>, p: Partial<AppUser>) => Promise<void>;
+  school?: any;
+  principal?: any;
+  onSave: (s: any, p: any) => Promise<void>;
   onClose: () => void;
 }) {
   const [form, setForm] = useState({
     name: school?.name || "",
-    address: school?.address || "",
     city: school?.city || "",
     country: school?.country || "الجزائر",
-    principalName: principal?.displayName || "",
+    principalName: principal?.display_name || "",
     principalEmail: principal?.email || "",
     principalPassword: "",
     principalPhone: principal?.phone || "",
-    plan: school?.plan || "basic",
     status: school?.status || "نشطة",
   });
   const [saving, setSaving] = useState(false);
@@ -41,7 +38,7 @@ function SchoolModal({
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.principalName.trim() || !form.principalEmail.trim() || (!principal && !form.principalPassword)) {
-      setError("يرجى تعبئة الحقول الإجبارية (اسم المدرسة، اسم الإقليم، الإيميل، كلمة المرور)");
+      setError("يرجى تعبئة الحقول الإجبارية (اسم المدرسة، الإيميل، كلمة المرور)");
       return;
     }
     
@@ -50,15 +47,13 @@ function SchoolModal({
     try {
       await onSave({
         name: form.name.trim(),
-        address: form.address.trim(),
         city: form.city.trim(),
         country: form.country.trim(),
-        plan: form.plan as "free" | "basic" | "premium",
-        status: form.status as "نشطة" | "معلقة",
+        status: form.status,
       }, {
         displayName: form.principalName.trim(),
         email: form.principalEmail.trim().toLowerCase(),
-        passwordHash: form.principalPassword ? form.principalPassword : undefined,
+        passwordHash: form.principalPassword,
         phone: form.principalPhone.trim(),
       });
       onClose();
@@ -116,14 +111,6 @@ function SchoolModal({
                   <input type="text" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })}
                     placeholder="الجزائر العاصمة" className="input-field py-2.5 mt-1.5 text-sm" />
                 </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="label-xs">حالة الاشتراك</label>
-                  <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as any })}
-                    className="input-field py-2.5 mt-1.5 text-sm font-bold">
-                     <option value="نشطة">نشطة ✅</option>
-                     <option value="معلقة">معلقة ⛔</option>
-                  </select>
-                </div>
               </div>
             </div>
 
@@ -139,9 +126,9 @@ function SchoolModal({
                     placeholder="محمد الأمين" className="input-field py-2.5 mt-1.5 text-sm" />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="label-xs">رقم هاتف المدير</label>
+                  <label className="label-xs">رقم الهاتف</label>
                   <input type="text" value={form.principalPhone} onChange={(e) => setForm({ ...form, principalPhone: e.target.value })}
-                    placeholder="0600000000" className="input-field py-2.5 mt-1.5 text-sm text-left" dir="ltr" />
+                    placeholder="0600..." className="input-field py-2.5 mt-1.5 text-sm text-left" dir="ltr" />
                 </div>
                 <div className="col-span-2">
                   <label className="label-xs">البريد الإلكتروني (لتسجيل الدخول) <span className="text-red-500">*</span></label>
@@ -171,33 +158,38 @@ function SchoolModal({
 }
 
 // ─── الصفحة الرئيسية ──────────────────────────────────────
-
 export default function SchoolsAdminPage() {
-  const { user, isSuperAdmin } = useAuth();
-  const [schools, setSchools] = useState<{ school: School, principal: AppUser | undefined, stats: { students: number, teachers: number } }[]>([]);
+  const { isSuperAdmin } = useAuth();
+  const [schools, setSchools] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   
-  const [editingItem, setEditingItem] = useState<{ school: School, principal?: AppUser } | undefined>(undefined);
+  const [editingItem, setEditingItem] = useState<any>(undefined);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!isSuperAdmin) return;
     setLoading(true);
-    const db = getDB();
     
-    // جلب جميع المدارس الحقيقية
-    const allSchools = await db.schools.toArray();
-    
+    // جلب كل المدارس باستثناء المقر الرئيسي
+    const { data: schoolsData, error } = await supabase
+      .from('schools')
+      .select('*')
+      .neq('name', 'المقر الرئيسي (HQ)');
+      
+    if (error) {
+      console.error(error);
+      setLoading(false);
+      return;
+    }
+
     const augmented = [];
-    for (const s of allSchools) {
-      if (s.name === "لوحة التحكم المركزية" && s.id === "system") continue;
+    for (const s of (schoolsData || [])) {
+      const { data: principal } = await supabase.from('users').select('*').eq('school_id', s.id).eq('role', 'principal').single();
+      const { count: studentsCount } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('school_id', s.id);
+      const { count: teachersCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('school_id', s.id).eq('role', 'teacher');
 
-      const principal = await db.users.where("schoolId").equals(s.id).filter(u => u.role === "principal").first();
-      const studentsCount = await db.students.where("schoolId").equals(s.id).count();
-      const teachersCount = await db.users.where("schoolId").equals(s.id).filter(u => u.role === "teacher").count();
-
-      augmented.push({ school: s, principal, stats: { students: studentsCount, teachers: teachersCount } });
+      augmented.push({ school: s, principal, stats: { students: studentsCount || 0, teachers: teachersCount || 0 } });
     }
       
     augmented.sort((a, b) => a.school.name.localeCompare(b.school.name, "ar"));
@@ -211,96 +203,46 @@ export default function SchoolsAdminPage() {
     !search || 
     s.school.name.includes(search) || 
     s.school.city?.includes(search) ||
-    s.principal?.displayName.includes(search)
+    s.principal?.display_name?.includes(search)
   );
 
-  const handleSave = async (schoolData: Partial<School>, principalData: Partial<AppUser>) => {
-    const db = getDB();
-    
+  const handleSave = async (schoolData: any, principalData: any) => {
     if (!editingItem) {
-      const exists = await db.users.where("email").equals(principalData.email!).first();
-      if (exists) throw new Error("البريد الإلكتروني للإدارة مسجل مسبقاً في النظام");
-      
-      const newSchoolId = uuid();
-      const newSchool: School = {
-        id: newSchoolId,
-        name: schoolData.name!,
-        address: schoolData.address || "",
-        city: schoolData.city || "",
-        country: schoolData.country || "الجزائر",
-        phone: "",
-        email: "",
-        plan: schoolData.plan as any || "basic",
-        status: schoolData.status as any || "نشطة",
-        subscriptionEnd: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().slice(0, 10),
-        settings: {
-          currency: "DZD",
-          timezone: "Africa/Algiers",
-          academicYear: "2023-2024",
-          terms: []
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      
-      const newPrincipal: AppUser = {
-        id: uuid(),
-        schoolId: newSchoolId,
-        email: principalData.email!,
-        passwordHash: principalData.passwordHash || "123456",
-        displayName: principalData.displayName!,
-        role: "principal",
-        phone: principalData.phone,
-        isActive: true,
-        joinDate: new Date().toISOString().slice(0, 10),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      
-      await db.schools.put(newSchool);
-      await db.users.put(newPrincipal);
+      // Create utilizing our powerful Supabase RPC securely!
+      const { data, error } = await supabase.rpc('create_school_with_principal', {
+        p_school_name: schoolData.name,
+        p_city: schoolData.city,
+        p_country: schoolData.country,
+        p_principal_name: principalData.displayName,
+        p_email: principalData.email,
+        p_password: principalData.passwordHash
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
     } else {
-      const updateSchool = { ...schoolData, updatedAt: new Date().toISOString() };
-      await db.schools.update(editingItem.school.id, updateSchool);
-      
+      // Modify School
+      await supabase.from('schools').update(schoolData).eq('id', editingItem.school.id);
+      // Wait: modifying principal requires care (especially email/password in auth.users doesn't update via 'users' table).
+      // For now, we just update local profile display_name
       if (editingItem.principal) {
-        const updatePrincipal = { ...principalData, updatedAt: new Date().toISOString() };
-        if (!updatePrincipal.passwordHash) delete updatePrincipal.passwordHash;
-        await db.users.update(editingItem.principal.id, updatePrincipal);
-      } else {
-        const newPrincipal: AppUser = {
-          id: uuid(),
-          schoolId: editingItem.school.id,
-          email: principalData.email!,
-          passwordHash: principalData.passwordHash || "123456",
-          displayName: principalData.displayName!,
-          role: "principal",
-          phone: principalData.phone,
-          isActive: true,
-          joinDate: new Date().toISOString().slice(0, 10),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        await db.users.put(newPrincipal);
+        await supabase.from('users').update({ display_name: principalData.displayName }).eq('id', editingItem.principal.id);
       }
     }
-    
     await load();
   };
 
-  const handleDelete = async (s: { school: School, stats: { students: number, teachers: number }}) => {
+  const handleDelete = async (s: any) => {
     if (s.stats.students > 0 || s.stats.teachers > 0) {
       alert(`لا يمكن حذف المدرسة لأنها تحتوي على ${s.stats.students} طلاب و ${s.stats.teachers} معلمين.`);
       return;
     }
     
     if (confirm(`هل أنت متأكد من حذف المدرسة (${s.school.name}) نهائياً؟ سيحذف هذا جميع بياناتها.`)) {
-      const db = getDB();
-      const principals = await db.users.where("schoolId").equals(s.school.id).toArray();
-      await db.users.bulkDelete(principals.map(p => p.id));
-      await db.schools.delete(s.school.id);
-      
-      setSchools(prev => prev.filter(x => x.school.id !== s.school.id));
+      const { error } = await supabase.rpc('delete_school_with_principal', { p_school_id: s.school.id });
+      if (error) alert("خطأ أثناء الحذف: " + error.message);
+      else setSchools(prev => prev.filter(x => x.school.id !== s.school.id));
     }
   };
 
@@ -310,15 +252,14 @@ export default function SchoolsAdminPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      {/* الرأس */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2" style={{ fontFamily: "var(--font-headline)" }}>
             <Building2 className="w-6 h-6 text-indigo-600" />
-            إدارة المدارس (Super Admin)
+            المدارس المشتركة بالنظام (Supabase)
           </h1>
           <p className="text-xs text-gray-500 font-medium mt-1">
-            {schools.length} مدرسة مسجلة في منصة المدارس القرآنية
+            {schools.length} مدرسة مدارة بشكل سحابي وآمن بفضل RLS
           </p>
         </div>
         
@@ -328,12 +269,11 @@ export default function SchoolsAdminPage() {
         </button>
       </div>
 
-      {/* بحث وبطاقات */}
       <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm space-y-5">
         <div className="relative max-w-sm">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="ابحث باسم المدرسة، المدينة أو اسم المدير..."
+            placeholder="ابحث باسم المدرسة، المدينة أو المدير..."
             className="w-full pl-4 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 bg-gray-50/50" />
         </div>
 
@@ -345,29 +285,21 @@ export default function SchoolsAdminPage() {
           <div className="text-center py-16">
             <Building2 className="w-16 h-16 text-gray-200 mx-auto mb-4" />
             <p className="text-gray-400 font-bold text-lg">لا توجد مدارس حالياً</p>
-            <p className="text-gray-400 text-sm mt-1">يمكنك إضافة مدارس النظام من هنا</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {filtered.map(item => (
               <div key={item.school.id} className="border border-gray-100 rounded-2xl p-5 hover:border-indigo-200 hover:shadow-lg transition-all bg-white flex flex-col justify-between group">
                 <div>
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center font-black shadow-inner shrink-0 text-xl" style={{ fontFamily: "var(--font-headline)" }}>
-                        {item.school.name[0]}
-                      </div>
-                      <div>
-                        <h3 className="text-base font-black text-gray-900 truncate" title={item.school.name}>
-                          {item.school.name}
-                        </h3>
-                        <p className={`text-[10px] font-bold px-2 py-0.5 rounded-md inline-block mt-1 ${
-                          item.school.status === "نشطة" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
-                        }`}>
-                          {item.school.status}
-                        </p>
-                        <span className="mr-2 text-xs text-gray-400">{item.school.city}</span>
-                      </div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center font-black shadow-inner shrink-0 text-xl" style={{ fontFamily: "var(--font-headline)" }}>
+                      {item.school.name[0]}
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-gray-900 truncate" title={item.school.name}>
+                        {item.school.name}
+                      </h3>
+                      <span className="text-xs text-gray-400">{item.school.city}</span>
                     </div>
                   </div>
                   
@@ -375,7 +307,7 @@ export default function SchoolsAdminPage() {
                     <div className="p-3 bg-gray-50 rounded-xl space-y-2 border border-gray-100">
                       <p className="flex justify-between items-center">
                         <span className="flex items-center gap-1.5 opacity-70"><UserCog className="w-3.5 h-3.5" /> المدير:</span> 
-                        <span className="text-gray-800 font-bold truncate">{item.principal?.displayName || "غير محدد"}</span>
+                        <span className="text-gray-800 font-bold truncate">{item.principal?.display_name || "غير محدد"}</span>
                       </p>
                       <p className="flex justify-between items-center">
                         <span className="flex items-center gap-1.5 opacity-70"><Mail className="w-3.5 h-3.5" /> البريد:</span> 

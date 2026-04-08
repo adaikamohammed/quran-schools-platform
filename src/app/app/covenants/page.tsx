@@ -13,6 +13,7 @@ import {
   Filter, MoreHorizontal, Users
 } from "lucide-react";
 import { v4 as uuid } from "uuid";
+import { HintBulb } from "@/components/layout/HintBulb";
 
 // ─── الثوابت ─────────────────────────────────────────────
 
@@ -136,7 +137,18 @@ function CovenantModal({
           <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
             {/* نوع العهد */}
             <div>
-              <label className="label-xs">نوع العهد</label>
+              <label className="label-xs flex items-center gap-2">
+                نوع العهد
+                <HintBulb 
+                  size="sm"
+                  label="تفاصيل أنواع العهود"
+                  steps={[
+                    { title: "ميثاق حفظ", description: "يستخدم لإلزام الطالب بمراجعة ورد معين خلال فترة محددة لتدارك النسيان." },
+                    { title: "تعهد غياب", description: "عند تجاوز الحد المسموح به من الغياب، يتم تسجيل هذا التعهد." },
+                    { title: "إجراء تأديبي", description: "يُتخذ في حالات المخالفات السلوكية الجسيمة داخل الحلقة." }
+                  ]}
+                />
+              </label>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {COVENANT_TYPES.map((t) => (
                   <button key={t} onClick={() => up("type", t)}
@@ -153,7 +165,16 @@ function CovenantModal({
 
             {/* البطاقة */}
             <div>
-              <label className="label-xs">البطاقة</label>
+              <label className="label-xs flex items-center gap-2">
+                البطاقة التدريجية
+                <HintBulb 
+                  size="sm"
+                  label="تفاصيل عن البطاقات"
+                  steps={[
+                    { title: "نظام البطاقات", description: "البطاقة الصفراء بمثابة إنذار أولي للفت انتباه الطالب أو ولي أمره. أما البطاقة الحمراء فتعني مخالفة صريحة للعهد تستوجب حسم النقاط أو التواصل الرسمي." }
+                  ]}
+                />
+              </label>
               <div className="flex gap-2 mt-2">
                 {CARD_OPTS.map((c) => (
                   <button key={c.value} onClick={() => up("card", c.value)}
@@ -188,7 +209,15 @@ function CovenantModal({
             {/* تاريخ الاستحقاق + أيام الغياب */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label-xs">تاريخ الاستحقاق</label>
+                <label className="label-xs flex items-center gap-1.5">
+                  تاريخ الاستحقاق
+                  <HintBulb 
+                    size="sm"
+                    steps={[
+                        { title: "تاريخ انتهاء العهد", description: "اختر التاريخ الذي يجب على الطالب إتمام التزامه فيه ليتحول العهد لـ (تم الوفاء به)." }
+                    ]}
+                  />
+                </label>
                 <input type="date" value={form.dueDate}
                   onChange={(e) => up("dueDate", e.target.value)}
                   className="input-field text-sm py-2 mt-1.5" />
@@ -207,7 +236,13 @@ function CovenantModal({
             {/* العقوبة الكتابية */}
             {form.type === "إجراء تأديبي" && (
               <div>
-                <label className="label-xs">العقوبة الكتابية</label>
+                <label className="label-xs flex items-center gap-2">
+                  العقوبة الكتابية / الإجراء
+                  <HintBulb 
+                    size="sm"
+                    steps={[{ title: "الإجراء المتبع", description: "مثبّت كمرجع إداري. مثال: (كتابة سورة النبأ 3 مرات)، أو (حفظ 10 أبيات من الجزرية)." }]}
+                  />
+                </label>
                 <input value={form.writtenPenalty}
                   onChange={(e) => up("writtenPenalty", e.target.value)}
                   placeholder="مثال: كتابة سورة الملك 10 مرات"
@@ -329,8 +364,15 @@ export default function CovenantsPage() {
       {/* رأس */}
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black text-gray-900" style={{ fontFamily: "var(--font-headline)" }}>
+          <h1 className="text-2xl font-black text-gray-900 flex items-center gap-3" style={{ fontFamily: "var(--font-headline)" }}>
             العهود والعقوبات
+            <HintBulb 
+              label="فكرة العهود"
+              steps={[
+                { title: "نظام العهود القرآنية", description: "العهد هو وسيلة تواصل رسمية بين المسجد والبيت، يساعدك على ضبط سلوك الطالب وترميم حفظه عبر وضع أهداف أو إنذارات موثّقة." },
+                { title: "المعايير المتقدمة للعهد", description: "يمكنك عند إضافة العهد تعيين (بطاقات إنذار)، أو (مدة زمنية للاستحقاق)، أو (عقوبات كتابية) لتفصيل الالتزام بشكل احترافي." }
+              ]}
+            />
           </h1>
           <p className="text-xs text-gray-400 font-medium mt-0.5">
             {stats.total} عهد · {stats.active} نشط

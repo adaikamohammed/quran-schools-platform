@@ -1,36 +1,38 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET() {
   try {
-    const session = await getSession();
+    const supabase = await createClient();
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (!session?.userId) {
-      return NextResponse.json({ error: 'غير مصرح لك' }, { status: 401 });
+    if (authError || !user) {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.userId },
-    });
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id, email, display_name, role, school_id, group_name')
+      .eq('id', user.id)
+      .single();
 
-    if (!user || user.deletedAt || !user.isActive) {
-      return NextResponse.json({ error: 'الحساب غير موجود أو غير نشط' }, { status: 401 });
+    if (userError || !userData) {
+      return NextResponse.json({ error: 'الحساب التسجيلي غير متوفر' }, { status: 401 });
     }
 
     return NextResponse.json({
       user: {
-        id: user.id,
-        email: user.email,
-        displayName: user.displayName,
-        role: user.role,
-        schoolId: user.schoolId,
-        groupName: user.groupName,
-        photoURL: user.photoURL,
+        id: userData.id,
+        email: userData.email,
+        displayName: userData.display_name,
+        role: userData.role,
+        schoolId: userData.school_id,
+        groupName: userData.group_name,
       },
     });
   } catch (error) {
-    console.error('Me route error:', error);
-    return NextResponse.json({ error: 'حدث خطأ غير متوقع' }, { status: 500 });
+    console.error('Session error:', error);
+    return NextResponse.json({ error: 'خطأ فني في الإتصال' }, { status: 500 });
   }
 }

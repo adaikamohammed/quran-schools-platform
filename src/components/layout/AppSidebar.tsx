@@ -81,6 +81,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: "إدارة المنصة",
     items: [
       { href: "/app/schools-admin", label: "المدارس المسجلة", icon: Sparkles, roles: ["super_admin"] },
+      { href: "/app/school-requests", label: "طلبات المدارس", icon: ClipboardList, roles: ["super_admin"], badge: "جديد" },
     ],
   },
   {
