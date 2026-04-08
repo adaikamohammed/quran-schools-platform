@@ -2,13 +2,17 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendNewSchoolNotification, sendWelcomeEmail } from '@/lib/email';
 
-// استخدام service_role key لإنشاء المستخدم من جهة الخادم
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy getter — avoids top-level instantiation at build time
+// when SUPABASE_SERVICE_ROLE_KEY is not present in the build environment.
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 export async function POST(request: Request) {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const body = await request.json();
     const {
