@@ -9,6 +9,7 @@ import {
   User, Phone, MapPin, Globe, ArrowLeft, CheckCircle2,
   School, Shield, Zap, Globe2,
 } from "lucide-react";
+import { getDialCode } from "@/lib/countries";
 
 interface FormData {
   schoolName: string;
@@ -232,7 +233,14 @@ export default function RegisterPage() {
                     <div style={styles.inputIcon}><Globe size={18} color="#6b7280" /></div>
                     <select
                       value={form.country}
-                      onChange={e => set("country", e.target.value)}
+                      onChange={e => {
+                        const newCountry = e.target.value;
+                        set("country", newCountry);
+                        const dial = getDialCode(newCountry);
+                        if (!form.phone || form.phone.trim().length <= 5) {
+                          set("phone", dial);
+                        }
+                      }}
                       style={{
                         ...styles.input,
                         color: form.country ? "#111827" : "#9ca3af",

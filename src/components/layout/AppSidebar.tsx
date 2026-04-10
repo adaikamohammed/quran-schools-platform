@@ -49,6 +49,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: "الميدان التربوي",
     items: [
       { href: "/app", label: "لوحة التحكم", icon: LayoutDashboard },
+      { href: "/app/guide", label: "دليل المنصة", icon: Trophy, badge: "خريطة" },
       { href: "/app/sessions", label: "الحصص اليومية", icon: ClipboardList },
       { href: "/app/students", label: "إدارة الطلاب", icon: Users },
       { href: "/app/quran", label: "متابعة الحفظ", icon: BookCheck },

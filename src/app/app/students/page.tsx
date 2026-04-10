@@ -13,10 +13,17 @@ import {
   ArrowUpDown, Download, Share2,
 } from "lucide-react";
 import Link from "next/link";
+import { getDialCode } from "@/lib/countries";
 
 // ─── نموذج إضافة طالب ────────────────────────────────────
 
-const EDUCATION_LEVELS = ["روضة", "ابتدائي", "متوسط", "ثانوي", "جامعي", "خريج"];
+const EDUCATION_LEVELS = [
+  "روضة", "تمهيدي",
+  "1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي", "6 ابتدائي",
+  "1 متوسط / إعدادي", "2 متوسط / إعدادي", "3 متوسط / إعدادي", "4 متوسط",
+  "1 ثانوي", "2 ثانوي", "3 ثانوي",
+  "جامعي", "خريج / غير متمدرس"
+];
 const MEMORIZATION_AMOUNTS: MemorizationAmount[] = ["ثمن", "ربع", "نصف", "صفحة", "أكثر"];
 const SUBSCRIPTION_TIERS: SubscriptionTier[] = ["فئة الأصاغر", "فئة الأكابر"];
 
@@ -58,21 +65,60 @@ function StudentModal({
   onSave,
   initial,
   groups,
+  schoolCountry,
 }: {
   open: boolean;
   onClose: () => void;
   onSave: (data: StudentFormData) => Promise<void>;
   initial?: StudentFormData;
   groups: string[];
+  schoolCountry?: string;
 }) {
   const [form, setForm] = useState<StudentFormData>(initial ?? EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof StudentFormData, string>>>({});
+  const [ageInput, setAgeInput] = useState("");
 
   useEffect(() => {
-    setForm(initial ?? EMPTY_FORM);
-    setErrors({});
-  }, [open, initial]);
+    if (open) {
+      if (initial) {
+        setForm(initial);
+        if (initial.birthDate) {
+          const age = new Date().getFullYear() - new Date(initial.birthDate).getFullYear();
+          setAgeInput(age.toString());
+        } else {
+          setAgeInput("");
+        }
+      } else {
+        const dial = getDialCode(schoolCountry);
+        setForm({ ...EMPTY_FORM, phone1: dial });
+        setAgeInput("");
+      }
+      setErrors({});
+    }
+  }, [open, initial, schoolCountry]);
+
+  // Handle Age Input
+  const handleAgeChange = (val: string) => {
+    setAgeInput(val);
+    const num = parseInt(val);
+    if (!isNaN(num) && num > 0 && num < 100) {
+      const year = new Date().getFullYear() - num;
+      set("birthDate", `${year}-01-01`);
+    } else {
+      set("birthDate", "");
+    }
+  };
+
+  const handleBirthDateChange = (val: string) => {
+    set("birthDate", val);
+    if (val) {
+      const age = new Date().getFullYear() - new Date(val).getFullYear();
+      setAgeInput(age.toString());
+    } else {
+      setAgeInput("");
+    }
+  };
 
   const set = (field: keyof StudentFormData, value: any) =>
     setForm((p) => ({ ...p, [field]: value }));
@@ -170,39 +216,39 @@ function StudentModal({
                       </div>
                     </div>
 
-                    {/* تاريخ الميلاد */}
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-gray-700">تاريخ الميلاد *</label>
-                      <input
-                        type="date"
-                        value={form.birthDate}
-                        onChange={(e) => set("birthDate", e.target.value)}
-                        max={new Date().toISOString().slice(0, 10)}
-                        className={`input-field ${errors.birthDate ? "border-red-400" : ""}`}
-                      />
-                      {errors.birthDate && <p className="text-xs text-red-500">{errors.birthDate}</p>}
+                    {/* تاريخ الميلاد والعمر */}
+                    <div className="space-y-1.5 sm:col-span-2">
+                       <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-bold text-gray-700">تاريخ الميلاد *</label>
+                          <input
+                            type="date"
+                            value={form.birthDate}
+                            onChange={(e) => handleBirthDateChange(e.target.value)}
+                            max={new Date().toISOString().slice(0, 10)}
+                            className={`input-field ${errors.birthDate ? "border-red-400" : ""}`}
+                          />
+                          {errors.birthDate && <p className="text-xs text-red-500">{errors.birthDate}</p>}
+                        </div>
+                        <div>
+                          <label className="text-sm font-bold text-gray-700">العمر (سنوات)</label>
+                          <input
+                            type="number"
+                            value={ageInput}
+                            onChange={(e) => handleAgeChange(e.target.value)}
+                            className="input-field"
+                            placeholder="مثال: 12"
+                          />
+                        </div>
+                       </div>
                     </div>
 
                     {/* المستوى الدراسي */}
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 sm:col-span-2">
                       <label className="text-sm font-bold text-gray-700">المستوى الدراسي</label>
                       <select value={form.educationalLevel} onChange={(e) => set("educationalLevel", e.target.value)} className="input-field">
                         {EDUCATION_LEVELS.map((l) => <option key={l}>{l}</option>)}
                       </select>
-                    </div>
-
-                    {/* رقم الصفحة */}
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-gray-700">رقم في الصفحة</label>
-                      <input
-                        value={form.memorizedSurahsCount}
-                        type="number"
-                        min={0}
-                        max={114}
-                        onChange={(e) => set("memorizedSurahsCount", +e.target.value)}
-                        className="input-field"
-                        placeholder="عدد السور المحفوظة"
-                      />
                     </div>
                   </div>
                 </div>
@@ -268,6 +314,7 @@ function StudentModal({
                       <select value={form.subscriptionTier} onChange={(e) => set("subscriptionTier", e.target.value as SubscriptionTier)} className="input-field">
                         {SUBSCRIPTION_TIERS.map((t) => <option key={t}>{t}</option>)}
                       </select>
+                      <div className="text-[10.5px] text-gray-400 mt-1 flex items-center pr-1 border-r-2 border-indigo-200">فئة الإصاغر تكون مخفضة السعر، يحدد المدير السعر من الإعدادات.</div>
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-sm font-bold text-gray-700">كمية التحفيظ اليومي</label>
@@ -783,6 +830,7 @@ export default function StudentsPage() {
         onSave={handleSave}
         initial={editFormData}
         groups={groups}
+        schoolCountry={school?.country}
       />
 
       {/* Modal تأكيد الحذف */}

@@ -8,6 +8,7 @@ import {
   Users, Plus, Search, Edit, Trash2, X, AlertTriangle, CheckCircle2,
   Shield, UserCog, BookOpen
 } from "lucide-react";
+import { getDialCode } from "@/lib/countries";
 
 const supabase = createClient();
 
@@ -15,11 +16,13 @@ const supabase = createClient();
 function TeacherModal({
   teacher,
   schoolName,
+  schoolCountry,
   onSave,
   onClose,
 }: {
   teacher?: any;
   schoolName?: string;
+  schoolCountry?: string;
   onSave: (t: any) => Promise<void>;
   onClose: () => void;
 }) {
@@ -28,7 +31,7 @@ function TeacherModal({
     email: teacher?.email || "",
     password: "",
     groupName: teacher?.group_name || "",
-    phone: teacher?.phone || "",
+    phone: teacher?.phone || getDialCode(schoolCountry),
     gender: teacher?.gender || "ذكر",
   });
   const [saving, setSaving] = useState(false);
@@ -349,6 +352,7 @@ export default function TeachersPage() {
         <TeacherModal
           teacher={editingTeacher}
           schoolName={school?.name}
+          schoolCountry={school?.country}
           onSave={handleSave}
           onClose={() => setIsModalOpen(false)}
         />
