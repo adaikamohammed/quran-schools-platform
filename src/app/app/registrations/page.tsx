@@ -515,7 +515,7 @@ function StatusModal({ reg, schoolId, onSave, onClose }: {
               className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:border-[var(--color-primary)]/60"
             >
               <option value="">اختر المعلم...</option>
-              {teachers.map(t => <option key={t.id} value={t.id}>{t.fullName}</option>)}
+              {teachers.map(t => <option key={t.id} value={t.id}>{t.displayName}</option>)}
             </select>
             {!enroll.teacherId && <p className="text-[10px] text-red-500 font-bold">الشيخ إجباري لإلحاق الطالب</p>}
           </div>
