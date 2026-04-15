@@ -1,16 +1,29 @@
 "use client";
+import SchoolGuard from "@/components/layout/SchoolGuard";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getDB } from "@/lib/storage/db";
-import type { Student, DailySession, Covenant, AppUser } from "@/lib/types";
-import { motion, AnimatePresence } from "framer-motion";
+import type { Student, DailySession, AppUser, Payment, SurahProgress } from "@/lib/types";
+import { motion } from "framer-motion";
 import {
-  BarChart3, Calendar, CheckCircle, TrendingUp, AlertCircle, ShieldAlert,
-  Search, ChevronDown, User, Star, Clock, ShieldOff, Bookmark, Users
+  BarChart3, CheckCircle, TrendingUp, AlertCircle, ShieldAlert,
+  Users, Star, Clock, BookOpen, CreditCard, Award, Printer
 } from "lucide-react";
 
-export default function StudentHistoryPage() {
+type TimelineEvent = {
+  id: string;
+  dateStr: string;
+  timestamp: number;
+  type: 'session' | 'payment' | 'surah' | 'covenant';
+  title: string;
+  description: React.ReactNode;
+  icon: React.ElementType;
+  iconBg: string;
+  iconColor: string;
+};
+
+function StudentHistoryPage() {
   const { user, school, isPrincipal } = useAuth();
   const [teachers, setTeachers] = useState<AppUser[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>("all");
@@ -18,76 +31,213 @@ export default function StudentHistoryPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  const [sessions, setSessions] = useState<DailySession[]>([]);
 
-  // ─── تحميل الطلاب ───────────────────────────────────
+  // Raw data for the selected student
+  const [sessions, setSessions]             = useState<DailySession[]>([]);
+  const [payments, setPayments]             = useState<Payment[]>([]);
+  const [surahProgress, setSurahProgress]   = useState<SurahProgress[]>([]);
+
+  // ─── تحميل بيانات الطلاب ───────────────────────────────────
   const loadData = useCallback(async () => {
     if (!user?.id || !school?.id) return;
     setLoading(true);
     const db = getDB();
-    
+
     let studs: Student[] = [];
-    let allSessions: DailySession[] = [];
 
     if (isPrincipal || user.role === "super_admin") {
       const schoolTeachers = await db.users.where("schoolId").equals(school.id).filter(u => u.role === "teacher").toArray();
       setTeachers(schoolTeachers.sort((a,b) => a.displayName.localeCompare(b.displayName, "ar")));
 
       studs = await db.students.where("schoolId").equals(school.id).toArray();
-      allSessions = await db.sessions.where("schoolId").equals(school.id).toArray();
-
       if (selectedTeacherId !== "all") {
         studs = studs.filter(s => s.teacherId === selectedTeacherId);
-        allSessions = allSessions.filter(s => s.teacherId === selectedTeacherId);
       }
     } else {
       studs = await db.students.where("teacherId").equals(user.id).toArray();
-      allSessions = await db.sessions.where("teacherId").equals(user.id).toArray();
     }
-    
+
     studs.sort((a, b) => a.fullName.localeCompare(b.fullName, "ar"));
     setStudents(studs);
-    
-    // ترتيب تنازلي حسب التاريخ
-    allSessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    setSessions(allSessions);
-    
+
+    if (studs.length > 0 && !selectedStudentId) {
+      setSelectedStudentId(studs[0].id);
+    }
     setLoading(false);
-  }, [user?.id, school?.id, isPrincipal, selectedTeacherId]);
+  }, [user?.id, school?.id, isPrincipal, selectedTeacherId, selectedStudentId]);
 
   useEffect(() => { loadData(); }, [loadData]);
-  
-  // اختيار تلقائي لأول طالب إذا لم يكن هناك تحديد
+
+  // ─── تحميل السجل التفصيلي للطالب المختار ────────────────────────
   useEffect(() => {
-    if (students.length > 0 && !selectedStudentId) {
-      setSelectedStudentId(students[0].id);
-    }
-  }, [students, selectedStudentId]);
+    if (!selectedStudentId || !school?.id) return;
+    
+    const fetchStudentDetails = async () => {
+      const db = getDB();
+      // Sessions
+      let allSessions = await db.sessions.where("schoolId").equals(school.id).toArray();
+      // Keep only sessions where the student is recorded, or holidays
+      const studSessions = allSessions.filter(s => 
+        s.sessionType === "يوم عطلة" || s.records.some(r => r.studentId === selectedStudentId)
+      );
+      setSessions(studSessions);
+
+      // Payments
+      const studPayments = await db.payments.where("studentId").equals(selectedStudentId).toArray();
+      setPayments(studPayments);
+
+      // Surah Progress
+      const studProgress = await db.surahProgress.where("studentId").equals(selectedStudentId).toArray();
+      setSurahProgress(studProgress);
+    };
+
+    fetchStudentDetails();
+  }, [selectedStudentId, school?.id]);
 
   const selectedStudent = useMemo(() => students.find(s => s.id === selectedStudentId) || null, [selectedStudentId, students]);
 
-  // ─── بيانات الطالب المحددة ────────────────────────────
-  const studentHistory = useMemo(() => {
-    if (!selectedStudentId) return [];
-    
-    return sessions.map(session => {
-      const record = session.records.find(r => r.studentId === selectedStudentId);
-      if (!record && session.sessionType !== "يوم عطلة") return null;
-      
-      return {
-        date: session.date,
-        isHoliday: session.sessionType === "يوم عطلة",
-        record: record || null
-      };
-    }).filter(item => item !== null) as { date: string; isHoliday: boolean; record: any }[];
-  }, [selectedStudentId, sessions]);
+  // ─── بناء الخط الزمني الموحد (Timeline) ──────────────────────
+  const timelineEvents = useMemo(() => {
+    if (!selectedStudent) return [];
+    const events: TimelineEvent[] = [];
 
-  // ─── الإحصائيات ───────────────────────────────────────
+    // 1. حصص التسميع والمتابعة اليومية
+    sessions.forEach(session => {
+      const record = session.records.find(r => r.studentId === selectedStudent.id);
+      if (!record && session.sessionType !== "يوم عطلة") return;
+
+      const theDate = new Date(session.date);
+      let title = "تسجيل حصة غير متوفر";
+      let desc: React.ReactNode = "";
+      let icon = BookOpen;
+      let iconBg = "bg-blue-100";
+      let iconColor = "text-blue-600";
+
+      if (session.sessionType === "يوم عطلة") {
+        title = "عطلة رسمية";
+        icon = CheckCircle;
+        iconBg = "bg-gray-100";
+        iconColor = "text-gray-500";
+      } else if (record) {
+        if (record.attendance === "غائب") {
+          title = "غياب عن الحصة";
+          icon = AlertCircle;
+          iconBg = "bg-red-100";
+          iconColor = "text-red-600";
+          desc = record.notes || "لم يُقدم عذر للغياب.";
+        } else if (record.attendance === "حاضر" || record.attendance === "تعويض" || record.attendance === "متأخر") {
+          title = record.attendance === "حاضر" ? "حضور طبيعي" : record.attendance;
+          if (record.attendance === "متأخر") {
+             icon=Clock; iconBg="bg-amber-100"; iconColor="text-amber-600";
+          } else {
+             icon=CheckCircle; iconBg="bg-emerald-100"; iconColor="text-emerald-600";
+          }
+          
+          desc = (
+            <div className="flex flex-col gap-1 mt-1">
+              {record.memorization && (
+                <div className="flex items-center gap-1 text-sm font-bold text-gray-700">
+                  <Star className="w-3.5 h-3.5 text-amber-500" />
+                  أداء التحفيظ: {record.memorization}
+                </div>
+              )}
+              {record.notes && <p className="text-sm text-gray-500">"{record.notes}"</p>}
+              {record.behavior && (
+                <div className="inline-flex mt-1">
+                  <span className="text-xs px-2 py-0.5 rounded-full border border-gray-200 bg-gray-50 text-gray-600 font-bold">
+                    السلوك: {record.behavior}
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        }
+      }
+
+      events.push({
+        id: session.id,
+        dateStr: session.date,
+        timestamp: theDate.getTime(),
+        type: 'session',
+        title,
+        description: desc,
+        icon, iconBg, iconColor
+      });
+    });
+
+    // 2. المدفوعات المالية
+    payments.forEach(payment => {
+      const pDate = new Date(payment.paidAt || payment.date);
+      events.push({
+        id: payment.id,
+        dateStr: payment.paidAt || payment.date,
+        timestamp: pDate.getTime(),
+        type: 'payment',
+        title: `دفعة مالية (${payment.amount} د.ج)`,
+        description: `تم سداد قسط الفصل الدراسي: ${payment.date}`,
+        icon: CreditCard,
+        iconBg: "bg-purple-100",
+        iconColor: "text-purple-600"
+      });
+    });
+
+    // 3. مسار السور المنجزة
+    surahProgress.forEach(progress => {
+      if (progress.completionDate && progress.status === "تم الحفظ") {
+        events.push({
+          id: progress.id,
+          dateStr: progress.completionDate,
+          timestamp: new Date(progress.completionDate).getTime(),
+          type: 'surah',
+          title: "ختم سورة كاملة",
+          description: `أتم الطالب حفظ سورة ${progress.surahName} ✨`,
+          icon: Award,
+          iconBg: "bg-yellow-100",
+          iconColor: "text-yellow-600"
+        });
+      }
+    });
+
+    // 4. المخالفات والتعهدات
+    if (selectedStudent.covenants) {
+      selectedStudent.covenants.forEach(cov => {
+        events.push({
+          id: cov.id,
+          dateStr: cov.date,
+          timestamp: new Date(cov.date).getTime(),
+          type: 'covenant',
+          title: `تعهد: ${cov.type}`,
+          description: (
+             <div className="flex flex-col gap-1">
+               <p className="text-sm text-gray-600">{cov.text}</p>
+               <span className="text-xs font-black text-red-600 mt-1">بطاقة: {cov.card}</span>
+             </div>
+          ),
+          icon: ShieldAlert,
+          iconBg: "bg-rose-100",
+          iconColor: "text-rose-600"
+        });
+      });
+    }
+
+    // فرز من الأحدث للأقدم
+    return events.sort((a, b) => b.timestamp - a.timestamp);
+  }, [selectedStudent, sessions, payments, surahProgress]);
+
+  // ─── الإحصائيات (مبنية على الحصص) ──────────────────────
   const stats = useMemo(() => {
-    const validRecords = studentHistory.filter(h => h.record && !h.isHoliday).map(h => h.record);
-    const presentCount = validRecords.filter(r => r.attendance === "حاضر").length;
-    const lateCount = validRecords.filter(r => r.attendance === "متأخر").length;
-    const absentCount = validRecords.filter(r => r.attendance === "غياب").length;
+    let presentCount = 0, lateCount = 0, absentCount = 0;
+    
+    sessions.forEach(s => {
+      if(s.sessionType === "يوم عطلة") return;
+      const r = s.records.find(rx => rx.studentId === selectedStudentId);
+      if (r) {
+        if(r.attendance === "حاضر" || r.attendance === "تعويض") presentCount++;
+        else if (r.attendance === "متأخر") lateCount++;
+        else if (r.attendance === "غائب") absentCount++;
+      }
+    });
+    
     const totalWorking = presentCount + lateCount + absentCount;
     const rate = totalWorking > 0 ? ((presentCount + lateCount) / totalWorking) * 100 : 0;
     
@@ -98,25 +248,117 @@ export default function StudentHistoryPage() {
       rate: Math.round(rate),
       total: totalWorking
     };
-  }, [studentHistory]);
+  }, [sessions, selectedStudentId]);
+
+  // ─── دالة الطباعة ───────────────────────────────────────
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrint = () => {
+    const printContent = printRef.current;
+    if (!printContent) return;
+    const windowPrint = window.open('', '', 'width=900,height=650');
+    if (!windowPrint) return;
+
+    windowPrint.document.write(`
+      <html dir="rtl">
+        <head>
+          <title>سجل الطالب - ${selectedStudent?.fullName}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
+            body { font-family: 'Cairo', sans-serif; color: #1f2937; margin: 0; padding: 40px; background: white; }
+            h1, h2 { color: #111827; }
+            .header { text-align: center; border-bottom: 2px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 30px; }
+            .grid-stats { display: flex; justify-content: space-between; margin-bottom: 30px; }
+            .stat-box { border: 1px solid #e5e7eb; padding: 15px; border-radius: 10px; width: 22%; text-align: center; }
+            .stat-num { font-size: 24px; font-weight: 900; margin-bottom: 5px; }
+            .timeline { list-style: none; padding: 0; position: relative; }
+            .event { padding-right: 30px; position: relative; margin-bottom: 25px; page-break-inside: avoid; }
+            .event:before { content: ''; position: absolute; right: 0; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: #3b82f6; }
+            .event-surah:before { background: #eab308; }
+            .event-payment:before { background: #a855f7; }
+            .event-covenant:before { background: #ef4444; }
+            .date { font-size: 12px; color: #6b7280; font-weight: bold; margin-bottom: 5px; }
+            .title { font-size: 16px; font-weight: bold; margin: 0 0 5px; }
+            .desc { font-size: 14px; color: #4b5563; margin: 0; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>سجل نشاط الطالب التاريخي</h1>
+            <h2>${selectedStudent?.fullName}</h2>
+            <p>مدرسة: ${school?.name} | الفوج: ${selectedStudent?.groupName}</p>
+          </div>
+          
+          <div class="grid-stats">
+            <div class="stat-box">
+              <div class="stat-num">${stats.rate}%</div>
+              <div>نسبة الحضور</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-num">${surahProgress.filter(s => s.status === "تم الحفظ").length}</div>
+              <div>السور المختومة</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-num">${payments.reduce((sum, p) => sum + p.amount, 0)} د.ج</div>
+              <div>إجمالي المدفوعات</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-num" style="color: #ef4444;">${selectedStudent?.covenants?.length || 0}</div>
+              <div>التعهدات</div>
+            </div>
+          </div>
+
+          <h3>التسلسل الزمني للنشاطات:</h3>
+          <ul class="timeline">
+            ${timelineEvents.map(e => `
+              <li class="event event-${e.type}">
+                <div class="date">${e.dateStr}</div>
+                <h4 class="title">${e.title}</h4>
+                <div class="desc">${typeof e.description === 'string' ? e.description : 'نشاط مسجل (انظر التفاصيل في المنصة)'}</div>
+              </li>
+            `).join('')}
+          </ul>
+          
+          <div style="margin-top: 50px; text-align: center; font-size: 12px; color: #9ca3af;">
+            طُبع من منصة مدارس القرآن بتاريخ ${new Date().toLocaleDateString('ar-DZ')}
+          </div>
+        </body>
+      </html>
+    `);
+    windowPrint.document.close();
+    windowPrint.focus();
+    setTimeout(() => {
+      windowPrint.print();
+    }, 500);
+  };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* رأس الصفحة + تحديد الطالب */}
+    <div className="max-w-4xl mx-auto space-y-6 pb-20">
+      {/* ── رأس الصفحة واختيار الطالب ── */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2" style={{ fontFamily: "var(--font-headline)" }}>
             <BarChart3 className="w-6 h-6 text-[var(--color-primary)]" />
-            سجل الطالب التفصيلي
+            السجل التاريخي الشامل للطالب
           </h1>
           <p className="text-xs text-gray-500 font-medium mt-1">
-            متابعة شاملة للحضور، التقييم، والسلوك، والعهود المسجلة
+            خط زمني موحد (حضور، مدفوعات، تقدم الحفظ، ومخالفات)
           </p>
         </div>
         
-        <div className="w-full md:w-64">
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          {selectedStudent && (
+            <button 
+              onClick={handlePrint}
+              className="btn btn-secondary h-[42px] px-3 shrink-0 flex items-center gap-2"
+              title="طباعة السجل"
+            >
+              <Printer className="w-4 h-4" />
+              <span className="hidden sm:inline text-sm">طباعة</span>
+            </button>
+          )}
           <select 
-            className="input-field py-2.5 text-sm font-bold w-full"
+            className="input-field py-2.5 text-sm font-bold w-full md:w-64"
             value={selectedStudentId}
             onChange={(e) => setSelectedStudentId(e.target.value)}
             disabled={loading || students.length === 0}
@@ -129,7 +371,7 @@ export default function StudentHistoryPage() {
         </div>
       </div>
 
-      {/* ─── فلتر المعلم (للمدراء فقط) ─── */}
+      {/* ── فلتر المعلم (للمدراء فقط) ── */}
       {(isPrincipal || user?.role === "super_admin") && teachers.length > 0 && (
         <div className="bg-white rounded-2xl border border-[var(--color-border)] p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm mb-4">
           <div className="flex items-center gap-2">
@@ -149,12 +391,27 @@ export default function StudentHistoryPage() {
         </div>
       )}
 
+      {/* ── محتوى السجل ── */}
       {!loading && selectedStudent && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8" ref={printRef}>
           
-          {/* الإحصائيات */}
+          {/* بطاقة تعريف الطالب */}
+          <div className="bg-white rounded-3xl border border-[var(--color-border)] shadow-sm p-5 md:p-6 flex flex-col md:flex-row gap-6 items-center md:items-start">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] text-white flex items-center justify-center text-3xl font-black shrink-0 shadow-md">
+              {selectedStudent.fullName[0]}
+            </div>
+            <div className="flex-1 text-center md:text-right">
+              <h2 className="text-2xl font-black text-gray-900 mb-1">{selectedStudent.fullName}</h2>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm font-bold text-gray-500">
+                <span className="flex items-center gap-1"><Users className="w-4 h-4"/> الفوج: {selectedStudent.groupName}</span>
+                <span className="flex items-center gap-1"><CheckCircle className="w-4 h-4"/> الحالة: <span className="text-emerald-600">{selectedStudent.status}</span></span>
+              </div>
+            </div>
+          </div>
+
+          {/* الإحصائيات الأربعة المستمدة من أنشطة مختلفة */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-             <div className="bg-white border rounded-2xl p-4 flex items-center gap-3">
+            <div className="bg-white border rounded-2xl p-4 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                 <TrendingUp className="w-5 h-5" />
               </div>
@@ -164,144 +421,94 @@ export default function StudentHistoryPage() {
               </div>
             </div>
             <div className="bg-white border rounded-2xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <CheckCircle className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl bg-yellow-50 text-yellow-600 flex items-center justify-center shrink-0">
+                <Award className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xl font-black text-gray-900">{stats.present}</p>
-                <p className="text-xs font-bold text-gray-500">حاضر</p>
+                <p className="text-xl font-black text-gray-900">{surahProgress.filter(sp => sp.status === "تم الحفظ").length}</p>
+                <p className="text-xs font-bold text-gray-500">سور مختومة</p>
               </div>
             </div>
             <div className="bg-white border rounded-2xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                <Clock className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                <CreditCard className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xl font-black text-gray-900">{stats.late}</p>
-                <p className="text-xs font-bold text-gray-500">متأخر</p>
+                <p className="text-lg font-black text-gray-900">{payments.reduce((sum, p) => sum + p.amount, 0)} د.ج</p>
+                <p className="text-xs font-bold text-gray-500">إجمالي المدفوعات</p>
               </div>
             </div>
             <div className="bg-white border rounded-2xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
-                <AlertCircle className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                <ShieldAlert className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xl font-black text-gray-900">{stats.absent}</p>
-                <p className="text-xs font-bold text-gray-500">غياب</p>
+                <p className="text-xl font-black text-gray-900">{selectedStudent.covenants?.length || 0}</p>
+                <p className="text-xs font-bold text-gray-500">التعهدات</p>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* سجل الحلقات */}
-            <div className="lg:col-span-2 space-y-4 border bg-white rounded-3xl p-5">
-              <h2 className="text-lg font-black flex items-center gap-2 mb-4 text-gray-800">
-                <Bookmark className="w-5 h-5 text-[var(--color-primary)]" />
-                آخر الحصص اليومية
-              </h2>
-              
-              {studentHistory.length === 0 ? (
-                <div className="text-center py-10 bg-gray-50 rounded-2xl">
-                  <p className="text-gray-400 font-bold">لا توجد سجلات حصص لهذا الطالب</p>
-                </div>
-              ) : (
-                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin">
-                  {studentHistory.slice(0, 30).map((h, i) => (
-                    <div key={i} className="p-3 border rounded-xl flex items-center justify-between gap-3 bg-gray-50/50 hover:bg-white transition-colors">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-white border border-gray-100 flex flex-col items-center justify-center shrink-0">
-                          <span className="text-[10px] font-bold text-gray-400 leading-none mb-0.5">{new Date(h.date).toLocaleDateString("ar-DZ", { month: "short" })}</span>
-                          <span className="text-sm font-black text-[var(--color-primary)] leading-none">{new Date(h.date).getDate()}</span>
-                        </div>
-                        
-                        {h.isHoliday ? (
-                          <span className="text-sm font-bold text-blue-600">عطلة رسمية</span>
-                        ) : (
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                                h.record?.attendance === "حاضر" ? "bg-emerald-100 text-emerald-700" :
-                                h.record?.attendance === "متأخر" ? "bg-amber-100 text-amber-700" :
-                                "bg-red-100 text-red-700"
-                              }`}>
-                                {h.record?.attendance || "غير مسجل"}
-                              </span>
-                              {h.record?.memorization && (
-                                <span className="text-xs font-bold text-gray-600 flex items-center gap-1">
-                                  <Star className="w-3 h-3 text-amber-500" /> {h.record.memorization}
-                                </span>
-                              )}
-                            </div>
-                            {h.record?.notes && (
-                              <p className="text-xs text-gray-500 mt-1 truncate max-w-[200px] sm:max-w-xs block">
-                                "{h.record.notes}"
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      
-                      {h.record?.behavior && (
-                        <div className="shrink-0 flex items-center">
-                          <span className={`text-[10px] sm:text-xs font-bold px-2 py-1 rounded-lg border ${
-                            h.record.behavior.includes("هادئ") ? "border-emerald-200 text-emerald-700 bg-emerald-50" :
-                            h.record.behavior.includes("مشاغب") ? "border-red-200 text-red-700 bg-red-50" :
-                            "border-blue-200 text-blue-700 bg-blue-50"
-                          }`}>
-                            {h.record.behavior}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+          {/* الخط الزمني الموحد (Unified Timeline) */}
+          <div className="bg-white border border-[var(--color-border)] rounded-3xl p-6 shadow-sm">
+            <h3 className="text-lg font-black text-gray-900 mb-8 flex items-center gap-2 border-b pb-4">
+              <Clock className="w-5 h-5 text-[var(--color-primary)]" />
+              الخط الزمني الشامل للأحداث
+            </h3>
 
-            {/* سجل العهود */}
-            <div className="space-y-4 border bg-red-50/20 border-red-100 rounded-3xl p-5">
-              <h2 className="text-lg font-black flex items-center gap-2 mb-4 text-red-900">
-                <ShieldAlert className="w-5 h-5 text-red-600" />
-                سجل التعهدات
-              </h2>
-              
-              {!selectedStudent.covenants || selectedStudent.covenants.length === 0 ? (
-                <div className="text-center py-10 bg-white rounded-2xl border border-red-50">
-                  <ShieldOff className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-                  <p className="text-sm text-gray-400 font-bold">سجل الطالب نظيف</p>
+            {timelineEvents.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Clock className="w-8 h-8 text-gray-300" />
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {selectedStudent.covenants.map(cov => (
-                    <div key={cov.id} className="p-3 bg-white border border-red-100 rounded-xl shadow-sm">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-black text-red-700 bg-red-50 px-2 py-0.5 rounded-full">{cov.type}</span>
-                        <span className="text-[10px] font-bold text-gray-400">{new Date(cov.date).toLocaleDateString("ar-DZ")}</span>
-                      </div>
-                      <p className="text-xs text-gray-700 font-medium mb-2 leading-relaxed line-clamp-2" title={cov.text}>
-                        {cov.text}
-                      </p>
-                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          cov.status === "نشط" ? "bg-amber-100 text-amber-700" :
-                          cov.status === "تم الوفاء بها" ? "bg-emerald-100 text-emerald-700" :
-                          "bg-red-100 text-red-700"
-                        }`}>
-                          {cov.status}
+                <p className="text-gray-500 font-bold">لا توجد أي نشاطات مسجلة لهذا الطالب حتى الآن.</p>
+              </div>
+            ) : (
+              <div className="relative border-r-2 border-gray-100 pr-6 space-y-8 mr-2">
+                {timelineEvents.map((event, idx) => (
+                  <motion.div 
+                    key={`${event.id}-${idx}`}
+                    initial={{ opacity: 0, x: -10 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true, margin: "-50px" }}
+                    className="relative"
+                  >
+                    {/* النقطة الملونة للأيقونة */}
+                    <div className={`absolute -right-[35px] top-0 w-10 h-10 rounded-full flex items-center justify-center border-4 border-white ${event.iconBg} ${event.iconColor} shadow-sm`}>
+                      <event.icon className="w-4 h-4" />
+                    </div>
+                    
+                    {/* محتوى الحدث */}
+                    <div className="bg-gray-50/50 hover:bg-white border border-gray-100 transition-colors rounded-2xl p-4 shadow-sm">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                        <h4 className={`text-base font-black ${event.iconColor.replace('text-', 'text-')}`}>{event.title}</h4>
+                        <span className="text-xs font-bold text-gray-400 bg-white px-2 py-1 rounded-lg border">
+                          {new Date(event.dateStr).toLocaleDateString("ar-DZ", { 
+                            weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' 
+                          })}
                         </span>
-                        {cov.card !== "بدون" && (
-                          <span className="text-xs font-black">{cov.card === "بطاقة صفراء" ? "🟡" : "🔴"}</span>
-                        )}
+                      </div>
+                      <div className="text-sm text-gray-700">
+                        {event.description}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </div>
+
         </motion.div>
       )}
     </div>
+  );
+}
+
+// ── Guard wrapper ──
+export default function StudentHistoryPagePage() {
+  return (
+    <SchoolGuard>
+      <StudentHistoryPage />
+    </SchoolGuard>
   );
 }

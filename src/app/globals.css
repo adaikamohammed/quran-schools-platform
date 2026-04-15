@@ -2,6 +2,8 @@
 
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-headline: 'Cairo', sans-serif;
   --font-body: 'Tajawal', sans-serif;
@@ -26,6 +28,37 @@
   --radius-xl: 1.5rem;
   --radius-2xl: 2rem;
   --radius-3xl: 3rem;
+}
+
+/* ────────────────────────────────────────────────
+   Dark Mode Variables
+──────────────────────────────────────────────── */
+html.dark {
+  --color-primary: #15a870;
+  --color-primary-light: #0d3d2a;
+  --color-primary-dark: #0d9460;
+  --color-secondary: #f59e0b;
+  --color-secondary-light: #3d2e00;
+  --color-secondary-dark: #d97706;
+
+  --color-background: #0f1117;
+  --color-foreground: #e8e8f0;
+  --color-card: #1a1d27;
+  --color-border: #2a2d3e;
+  --color-muted: #1e2130;
+  --color-muted-foreground: #8b92a5;
+}
+
+html, body {
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+/* ────────────────────────────────────────────────
+   Sidebar CSS Variables
+──────────────────────────────────────────────── */
+:root {
+  --sidebar-width: 17rem;
+  --sidebar-width-collapsed: 4.5rem;
 }
 
 /* Base styles */
@@ -277,3 +310,221 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: 0.08em;
 }
 
+/* ────────────────────────────────────────────────
+   Dark Mode Overrides
+──────────────────────────────────────────────── */
+html.dark body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+html.dark .glass {
+  background: rgba(20, 25, 40, 0.8);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .glass-dark {
+  background: rgba(5, 10, 20, 0.85);
+}
+
+html.dark .card-gradient {
+  background: linear-gradient(135deg, #1a1d27 0%, #141820 100%);
+}
+
+html.dark .hero-bg {
+  background:
+    radial-gradient(ellipse 70% 60% at 80% 40%, rgba(21, 168, 112, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 50% at 20% 70%, rgba(245, 158, 11, 0.08) 0%, transparent 55%),
+    #0f1117;
+}
+
+html.dark .btn-secondary {
+  background: #1a1d27;
+  color: #15a870;
+  border-color: rgba(21, 168, 112, 0.25);
+}
+
+html.dark .input-field {
+  background: #1e2130;
+  border-color: #2a2d3e;
+  color: #e8e8f0;
+}
+
+html.dark .input-field:focus {
+  border-color: #15a870;
+  box-shadow: 0 0 0 3px rgba(21, 168, 112, 0.15);
+}
+
+/* Sidebar dark mode */
+html.dark .sidebar-bg {
+  background: #13161f;
+  border-color: #2a2d3e;
+}
+
+/* Scrollbar */
+.scrollbar-thin::-webkit-scrollbar { width: 4px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.3); border-radius: 99px; }
+.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,0.5); }
+
+/* Sidebar transition */
+.sidebar-transition {
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Collapsed sidebar — hide text, show only icons */
+.sidebar-collapsed .sidebar-label { display: none; }
+.sidebar-collapsed .sidebar-group-title { display: none; }
+.sidebar-collapsed .sidebar-user-info { display: none; }
+
+/* ────────────────────────────────────────────────
+   Shimmer Skeleton (sweep effect)
+──────────────────────────────────────────────── */
+@keyframes shimmer-sweep {
+  0%   { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: #f1f5f9;
+}
+html.dark .skeleton-shimmer { background-color: rgba(255,255,255,0.06); }
+
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.6) 50%,
+    transparent 100%
+  );
+  animation: shimmer-sweep 1.4s ease-in-out infinite;
+}
+html.dark .skeleton-shimmer::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.08) 50%,
+    transparent 100%
+  );
+}
+
+/* ────────────────────────────────────────────────
+   Mobile Bottom Navigation Bar
+──────────────────────────────────────────────── */
+.mobile-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  inset-inline: 0;
+  z-index: 40;
+  display: flex;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--color-border);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+html.dark .mobile-bottom-nav {
+  background: rgba(26, 29, 39, 0.97);
+  border-top-color: rgba(255,255,255,0.06);
+}
+
+.mobile-bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 10px 4px;
+  min-height: 56px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-muted-foreground);
+  text-decoration: none;
+  transition: color 0.2s, transform 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.mobile-bottom-nav-item:active {
+  transform: scale(0.92);
+}
+.mobile-bottom-nav-item.active {
+  color: var(--color-primary);
+}
+.mobile-bottom-nav-item.active svg {
+  stroke-width: 2.5;
+}
+
+/* Push main content up on mobile to avoid nav overlap */
+@media (max-width: 1023px) {
+  .app-main-content {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ── Force hide mobile bottom nav on desktop ── */
+@media (min-width: 1024px) {
+  .mobile-bottom-nav {
+    display: none !important;
+  }
+}
+
+
+/* ────────────────────────────────────────────────
+   Mobile UX Improvements
+──────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* Larger tap targets */
+  .btn-primary, .btn-secondary, .btn-gold {
+    min-height: 48px;
+    padding: 0.875rem 1.25rem;
+  }
+
+  /* Input fields easier to tap */
+  .input-field {
+    min-height: 48px;
+    font-size: 1rem; /* Prevents iOS zoom */
+  }
+
+  /* Slightly larger text on mobile */
+  .mobile-text-base { font-size: 0.9375rem; }
+}
+
+/* ────────────────────────────────────────────────
+   Touch Feedback for interactive elements
+──────────────────────────────────────────────── */
+@media (hover: none) {
+  button, a, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:active, a:active {
+    opacity: 0.75;
+    transition: opacity 0.1s;
+  }
+}
+
+/* Swipe hint for horizontal scrolls on mobile */
+.swipe-hint {
+  position: relative;
+}
+.swipe-hint::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 24px;
+  height: 100%;
+  background: linear-gradient(to right, var(--color-background), transparent);
+  pointer-events: none;
+}
+html[dir="rtl"] .swipe-hint::after {
+  left: auto;
+  right: 0;
+  background: linear-gradient(to left, var(--color-background), transparent);
+}

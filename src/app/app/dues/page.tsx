@@ -1,4 +1,5 @@
 "use client";
+import SchoolGuard from "@/components/layout/SchoolGuard";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -10,17 +11,38 @@ import {
   DollarSign, CheckCircle2, Clock, Shield,
   Search, Plus, X, Loader2, User,
   AlertTriangle, CreditCard, TrendingUp, Filter,
-  ChevronDown, Wallet, Check, Info,
+  ChevronDown, Wallet, Check, Info, MessageCircle,
 } from "lucide-react";
+import {
+  getCurrentSeason, getYearSeasons, formatSeasonLabel, ALL_SEASONS,
+  type SeasonNumber,
+} from "@/lib/seasons";
 
-// ─── فترات الاشتراك ──────────────────────────────────────
+// ─── فترات الاشتراك (نظام الفصول الأربعة) ────────────────────
+// كل سنة لها 4 فصول: يناير-مارس، أبريل-يونيو، يوليو-سبتمبر، أكتوبر-ديسمبر
 
-const SEASONS = [
-  { value: "2025-S1", label: "الفصل الأول 2025" },
-  { value: "2025-S2", label: "الفصل الثاني 2025" },
-  { value: "2026-S1", label: "الفصل الأول 2026" },
-  { value: "2026-S2", label: "الفصل الثاني 2026" },
-];
+function buildSeasonOptions() {
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear - 1, currentYear, currentYear + 1];
+  const options: { value: string; label: string }[] = [];
+  for (const year of years) {
+    getYearSeasons(year).forEach((s) => {
+      options.push({
+        value: `${year}-Q${s.number}`,
+        label: `${s.emoji} ${s.name} ${year} (${s.from.slice(5, 7)}/${s.to.slice(5, 7)})`,
+      });
+    });
+  }
+  return options;
+}
+
+const SEASON_OPTIONS = buildSeasonOptions();
+
+// القيمة الافتراضية: الفصل الحالي
+const currentSeasonDefault = (() => {
+  const s = getCurrentSeason();
+  return `${new Date().getFullYear()}-Q${s.number}`;
+})();
 
 const STATUS_CFG: Record<PaymentStatus, { label: string; color: string; bg: string; border: string; icon: React.ElementType }> = {
   paid: { label: "مدفوع", color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200", icon: CheckCircle2 },
@@ -28,15 +50,44 @@ const STATUS_CFG: Record<PaymentStatus, { label: string; color: string; bg: stri
   exempted: { label: "معفى", color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200", icon: Shield },
 };
 
+// ─── دالة وسيلة واتسآب ───────────────────────────────────
+
+
+function sendWhatsApp(student: Student, payment: Payment, season: string, schoolName: string) {
+  const phone = student.phone1.replace(/\D/g, "");
+  const normalizedPhone = phone.startsWith("0") ? "213" + phone.slice(1) : phone;
+  const receiptNum = payment.id.slice(-6).toUpperCase();
+  const seasonLabel = SEASON_OPTIONS.find(s => s.value === season)?.label ?? season;
+  const msg = [
+    `📌 مدرسة ${schoolName}`,
+    ``,
+    `السلام عليكم ورحمة الله وبركاته`,
+    `نؤكد استلام اشتراك الطالب: *${student.fullName}*`,
+    ``,
+    `• الفصل: ${seasonLabel}`,
+    `• المبلغ: *${payment.amount} دج*`,
+    `• رقم الوصل: #${receiptNum}`,
+    ``,
+    `جزاكم الله خيراً 🌿`,
+  ].join("\n");
+
+  const url = `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(msg)}`;
+  window.open(url, "_blank");
+}
+
 // ─── سطر الطالب ──────────────────────────────────────────
 
 function StudentPaymentRow({
   student,
   payment,
+  season,
+  schoolName,
   onToggle,
 }: {
   student: Student;
   payment?: Payment;
+  season: string;
+  schoolName: string;
   onToggle: (status: PaymentStatus) => void;
 }) {
   const status: PaymentStatus = payment?.status ?? "unpaid";
@@ -64,6 +115,16 @@ function StudentPaymentRow({
         {cfg.label}
       </div>
 
+      {/* واتسآب (عند الدفع فقط) */}
+      {status === "paid" && payment && student.phone1 && (
+        <button
+          onClick={() => sendWhatsApp(student, payment, season, schoolName)}
+          className="w-8 h-8 rounded-xl bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center text-emerald-600 transition-colors shrink-0"
+          title="إرسال وصل عبر واتسآب">
+          <MessageCircle className="w-3.5 h-3.5" />
+        </button>
+      )}
+
       {/* تغيير */}
       <button onClick={() => onToggle(next)}
         className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors shrink-0"
@@ -76,12 +137,12 @@ function StudentPaymentRow({
 
 // ─── الصفحة ───────────────────────────────────────────────
 
-export default function DuesPage() {
+function DuesPage() {
   const { user, school } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [season, setSeason] = useState(SEASONS[2].value);
+  const [season, setSeason] = useState(currentSeasonDefault);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<PaymentStatus | "الكل">("الكل");
   const [saving, setSaving] = useState<string | null>(null);
@@ -187,7 +248,7 @@ export default function DuesPage() {
         {/* الفصل */}
         <select value={season} onChange={(e) => setSeason(e.target.value)}
           className="input-field text-sm py-2 flex-1 min-w-40">
-          {SEASONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          {SEASON_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
 
         {/* بحث */}
@@ -242,11 +303,22 @@ export default function DuesPage() {
               key={student.id}
               student={student}
               payment={getPayment(student.id)}
+              season={season}
+              schoolName={school?.name ?? "المدرسة"}
               onToggle={(next) => handleToggle(student, next)}
             />
           ))
         )}
       </div>
     </div>
+  );
+}
+
+// ── Guard wrapper (auto-generated) ──
+export default function DuesPagePage() {
+  return (
+    <SchoolGuard>
+      <DuesPage />
+    </SchoolGuard>
   );
 }

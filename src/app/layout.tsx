@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { AuthProvider } from "@/context/AuthContext";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "منصة المدارس القرآنية | نظام إدارة الحلقات",
@@ -16,6 +16,10 @@ export const metadata: Metadata = {
   },
 };
 
+// سكريبت الثيم المُضمَّن مباشرةً في HTML قبل أي React hydration
+// يمنع الوميض (flash) عند تحميل الصفحة
+const themeScript = `(function(){try{var t=localStorage.getItem('qsp-theme');if(t==='dark'){document.documentElement.classList.add('dark')}else if(!t){if(window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.classList.add('dark')}}}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -24,6 +28,24 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <head>
+        {/* تطبيق الثيم قبل أي render لمنع الوميض — strategy: beforeInteractive */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <script
+          // suppressHydrationWarning يمنع خطأ React 19 مع dangerouslySetInnerHTML
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: themeScript }}
+        />
+
+        {/* ─── PWA Meta Tags ─── */}
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#16a34a" />
+        <meta name="application-name" content="المدارس القرآنية" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="المدارس القرآنية" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
@@ -32,11 +54,10 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased">
-        <AuthProvider>
+        <Providers>
           {children}
-        </AuthProvider>
+        </Providers>
       </body>
     </html>
   );
 }
-

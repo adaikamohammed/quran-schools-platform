@@ -1,4 +1,5 @@
-"use client";
+﻿"use client";
+import SchoolGuard from "@/components/layout/SchoolGuard";
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -9,6 +10,7 @@ import {
   Shield, UserCog, BookOpen
 } from "lucide-react";
 import { getDialCode } from "@/lib/countries";
+import { PhotoPicker } from "@/components/ui/PhotoPicker";
 
 const supabase = createClient();
 
@@ -33,6 +35,7 @@ function TeacherModal({
     groupName: teacher?.group_name || "",
     phone: teacher?.phone || getDialCode(schoolCountry),
     gender: teacher?.gender || "ذكر",
+    photoURL: teacher?.photo_url || undefined,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -55,9 +58,10 @@ function TeacherModal({
 
   return (
     <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      <motion.div key="teacher-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <motion.div
+        key="teacher-modal"
         initial={{ opacity: 0, y: 30, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 30 }}
@@ -65,11 +69,16 @@ function TeacherModal({
       >
         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
           <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-gradient-to-l from-[var(--color-primary)] to-[var(--color-primary-dark)] text-white">
-            <div className="flex items-center gap-3">
-              <UserCog className="w-5 h-5 text-white/80" />
+            <div className="flex items-center gap-4">
+              <PhotoPicker
+                currentPhoto={form.photoURL}
+                displayName={form.displayName || "م"}
+                size="md"
+                onPhotoChange={(url) => setForm({ ...form, photoURL: url })}
+              />
               <div>
                 <h3 className="font-black text-sm">{teacher ? "تعديل بيانات المعلم" : "إضافة معلم جديد"}</h3>
-                <p className="text-white/70 text-xs">{schoolName}</p>
+                <p className="text-white/70 text-xs mt-0.5">{schoolName}</p>
               </div>
             </div>
             <button onClick={onClose} className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
@@ -146,7 +155,7 @@ function TeacherModal({
 }
 
 // ─── الصفحة الرئيسية ──────────────────────────────────────
-export default function TeachersPage() {
+function TeachersPage() {
   const { user, school, isPrincipal } = useAuth();
   const [teachers, setTeachers] = useState<any[]>([]);
   const [studentsCount, setStudentsCount] = useState<Record<string, number>>({});
@@ -213,6 +222,7 @@ export default function TeachersPage() {
           groupName: data.groupName || "فوج عام",
           phone: data.phone,
           gender: data.gender,
+          photoURL: data.photoURL,
         }),
       });
 
@@ -227,6 +237,7 @@ export default function TeachersPage() {
         group_name: data.groupName || editingTeacher.group_name,
         phone: data.phone,
         gender: data.gender,
+        photo_url: data.photoURL,
       };
 
       await supabase.from("users").update(updatePayload).eq("id", editingTeacher.id);
@@ -307,10 +318,16 @@ export default function TeachersPage() {
                 <div>
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] text-white flex items-center justify-center font-black shadow-inner shrink-0" style={{ fontFamily: "var(--font-headline)" }}>
-                        {(t.display_name || "؟")[0]}
-                      </div>
-                      <div>
+                      <div className="w-14 h-14 rounded-2xl shrink-0 overflow-hidden bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)]">
+                      {t.photo_url ? (
+                        <img src={t.photo_url} alt="photo" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-white font-black text-xl" style={{ fontFamily: "var(--font-headline)" }}>
+                          {t.display_name[0]}
+                        </div>
+                      )}
+                    </div>
+                    <div>
                         <h3 className="text-sm font-black text-gray-900 truncate" title={t.display_name}>
                           {t.display_name}
                         </h3>
@@ -358,5 +375,14 @@ export default function TeachersPage() {
         />
       )}
     </div>
+  );
+}
+
+// ── Guard wrapper (auto-generated) ──
+export default function TeachersPagePage() {
+  return (
+    <SchoolGuard>
+      <TeachersPage />
+    </SchoolGuard>
   );
 }

@@ -10,6 +10,10 @@ import type {
   DailyReport,
   Meeting,
   SyncQueueItem,
+  ActivityLog,
+  CampItem,
+  IssuedDocument,
+  TimetableEntry,
 } from '../types';
 
 // ============================================================
@@ -28,6 +32,10 @@ export class QuranSchoolsDB extends Dexie {
   reports!: Table<DailyReport>;
   meetings!: Table<Meeting>;
   syncQueue!: Table<SyncQueueItem>;
+  activityLogs!: Table<ActivityLog>;
+  campItems!: Table<CampItem>;
+  issuedDocuments!: Table<IssuedDocument>;
+  timetables!: Table<TimetableEntry>;
 
   constructor() {
     super('QuranSchoolsDB');
@@ -44,6 +52,43 @@ export class QuranSchoolsDB extends Dexie {
       reports: 'id, schoolId, teacherId, date, status, isPinned',
       meetings: 'id, schoolId, status, timestamp',
       syncQueue: 'id, table, status, createdAt, retries',
+    });
+
+    // الإصدار 2: إضافة جداول السجلات، المخيم، والوثائق
+    this.version(2).stores({
+      schools: 'id, name, country, createdAt',
+      users: 'id, schoolId, email, role, groupName, isActive',
+      students: 'id, schoolId, teacherId, groupName, fullName, status, gender, subscriptionTier, updatedAt',
+      sessions: 'id, schoolId, teacherId, date, sessionNumber, [teacherId+date]',
+      surahProgress: 'id, studentId, schoolId, surahId, status, updatedAt',
+      payments: 'id, schoolId, studentId, date, status',
+      registrations: 'id, schoolId, status, requestedAt, phone1',
+      reports: 'id, schoolId, teacherId, date, status, isPinned',
+      meetings: 'id, schoolId, status, timestamp',
+      syncQueue: 'id, table, status, createdAt, retries',
+      // جداول جديدة:
+      activityLogs: 'id, schoolId, userId, action, entityType, createdAt',
+      campItems: 'id, schoolId, campYear, category, status, createdAt',
+      issuedDocuments: 'id, schoolId, issuedBy, documentType, recipientId, issuedAt',
+    });
+
+    // الإصدار 3: إضافة جدول الحصص الأسبوعي
+    this.version(3).stores({
+      schools: 'id, name, country, createdAt',
+      users: 'id, schoolId, email, role, groupName, isActive',
+      students: 'id, schoolId, teacherId, groupName, fullName, status, gender, subscriptionTier, updatedAt',
+      sessions: 'id, schoolId, teacherId, date, sessionNumber, [teacherId+date]',
+      surahProgress: 'id, studentId, schoolId, surahId, status, updatedAt',
+      payments: 'id, schoolId, studentId, date, status',
+      registrations: 'id, schoolId, status, requestedAt, phone1',
+      reports: 'id, schoolId, teacherId, date, status, isPinned',
+      meetings: 'id, schoolId, status, timestamp',
+      syncQueue: 'id, table, status, createdAt, retries',
+      activityLogs: 'id, schoolId, userId, action, entityType, createdAt',
+      campItems: 'id, schoolId, campYear, category, status, createdAt',
+      issuedDocuments: 'id, schoolId, issuedBy, documentType, recipientId, issuedAt',
+      // جديد:
+      timetables: 'id, schoolId, teacherId, groupName, dayOfWeek, createdAt',
     });
   }
 }

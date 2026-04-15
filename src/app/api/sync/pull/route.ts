@@ -1,16 +1,32 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { getSession } from "@/lib/auth";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
 
-const supabase = createClient(
+// Service-role client for privileged DB reads
+const supabase = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
 export async function GET(req: Request) {
   try {
-    const session = await getSession();
-    if (!session || !session.schoolId) {
+    // استخدام Supabase Auth (نفس الجلسة التي تُنشئها صفحة تسجيل الدخول)
+    const authClient = await createClient();
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // جلب school_id من جدول المستخدمين
+    const { data: userData } = await supabase
+      .from("users")
+      .select("school_id")
+      .eq("id", user.id)
+      .single();
+
+    const schoolId = userData?.school_id;
+    if (!schoolId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -19,7 +35,6 @@ export async function GET(req: Request) {
     const lastSyncAt = lastSyncAtStr ?? new Date(0).toISOString();
 
     const changes: any[] = [];
-    const schoolId = session.schoolId;
 
     // 1. الطلاب
     const { data: students } = await supabase

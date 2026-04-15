@@ -1,4 +1,5 @@
 "use client";
+import SchoolGuard from "@/components/layout/SchoolGuard";
 
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -11,8 +12,9 @@ import {
   BookOpen, BookCheck, Search, ChevronDown,
   Star, TrendingUp, Award, CheckCircle2, Clock,
   Circle, RotateCcw, X, Users, Filter,
-  ChevronRight, Info, Sparkles, Target,
+  ChevronRight, Info, Sparkles, Target, Mic2
 } from "lucide-react";
+import type { TajweedRule } from "@/lib/types";
 
 // ─── حالة السورة ──────────────────────────────────────────
 
@@ -296,7 +298,7 @@ function SurahDetailModal({
 
 // ─── الصفحة الرئيسية ──────────────────────────────────────
 
-export default function QuranPage() {
+function QuranPage() {
   const { user, school, isPrincipal } = useAuth();
   const [teachers, setTeachers] = useState<AppUser[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>("all");
@@ -310,6 +312,16 @@ export default function QuranPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [filterStatus, setFilterStatus] = useState<SurahStatus | "الكل">("الكل");
   const [saving, setSaving] = useState(false);
+  const [currentTab, setCurrentTab] = useState<"hifz" | "tajweed">("hifz");
+
+  const TAJWEED_RULES: TajweedRule[] = [
+    'أحكام النون الساكنة والتنوين',
+    'أحكام الميم الساكنة',
+    'المدود',
+    'مخارج الحروف',
+    'القلقلة',
+    'التفخيم والترقيق'
+  ];
 
   // ─── تحميل الطلاب + تقدّم الحفظ ────────────────────────
 
@@ -435,6 +447,17 @@ export default function QuranPage() {
   const currentSurahStatus = selectedSurah
     ? (selectedProgress.get(selectedSurah.id) ?? "غير محفوظة")
     : "غير محفوظة";
+
+  const handleUpdateTajweed = async (rule: TajweedRule, value: 'متقن' | 'قيد التعلم' | 'غير مبدوء' | '') => {
+    if (!selectedStudent) return;
+    const newTajweed = {
+      ...selectedStudent.tajweed,
+      rules: { ...selectedStudent.tajweed?.rules, [rule]: value }
+    };
+    await updateStudent(selectedStudent.id, { tajweed: newTajweed });
+    // update local state
+    setStudents(prev => prev.map(s => s.id === selectedStudent.id ? { ...s, tajweed: newTajweed } : s));
+  };
 
   // ─── فلترة الطلاب ────────────────────────────────────────
 
@@ -613,20 +636,40 @@ export default function QuranPage() {
                 </button>
               </div>
             </div>
+            
+            {/* ─── التبويبات ─── */}
+            <div className="flex bg-gray-100 p-1.5 rounded-xl w-fit">
+              <button
+                 onClick={() => setCurrentTab("hifz")}
+                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${currentTab === "hifz" ? "bg-white text-emerald-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                <div className="flex items-center gap-2"><BookCheck className="w-4 h-4" /> سجل الحفظ (السور)</div>
+              </button>
+              {school?.settings?.enableTajweedTracking && (
+                 <button
+                   onClick={() => setCurrentTab("tajweed")}
+                   className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${currentTab === "tajweed" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                 >
+                   <div className="flex items-center gap-2"><Mic2 className="w-4 h-4" /> سجل التجويد التراكمي</div>
+                 </button>
+              )}
+            </div>
 
-            {/* ─── خريطة السور ─────────────────────── */}
-            <div className="bg-white rounded-2xl border border-[var(--color-border)] p-4">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-sm font-black text-gray-600">
-                  {filterStatus === "الكل" ? "جميع السور (114)" : `${filteredSurahs.length} سورة — ${filterStatus}`}
-                </p>
-                <button
-                  onClick={() => setFilterStatus("الكل")}
-                  className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
-                >
-                  إظهار الكل
-                </button>
-              </div>
+            {currentTab === "hifz" && (
+              <>
+                {/* ─── خريطة السور ─────────────────────── */}
+                <div className="bg-white rounded-2xl border border-[var(--color-border)] p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-sm font-black text-gray-600">
+                      {filterStatus === "الكل" ? "جميع السور (114)" : `${filteredSurahs.length} سورة — ${filterStatus}`}
+                    </p>
+                    <button
+                      onClick={() => setFilterStatus("الكل")}
+                      className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
+                    >
+                      إظهار الكل
+                    </button>
+                  </div>
 
               <motion.div
                 layout
@@ -687,10 +730,58 @@ export default function QuranPage() {
             {/* نصيحة */}
             <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl">
               <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-              <p className="text-xs text-blue-700 font-medium">
-                انقر على أي سورة لتغيير حالة حفظها — التغييرات تُحفظ فوراً محلياً وتُزامَن مع السحابة
-              </p>
+                <p className="text-xs text-blue-700 font-medium">
+                  انقر على أي سورة لتغيير حالة حفظها — التغييرات تُحفظ فوراً محلياً وتُزامَن مع السحابة
+                </p>
+              </div>
+            </>
+          )}
+
+          {currentTab === "tajweed" && (
+            <div className="bg-white rounded-2xl border border-[var(--color-border)] p-5 shadow-sm">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-100">
+                  <Mic2 className="w-5 h-5 text-indigo-500" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900 leading-tight">الأحكام التجويدية للطالب</h3>
+                  <p className="text-xs text-gray-500 mt-1">تتبع التطور المستمر بعيداً عن السور المحددة</p>
+                </div>
+              </div>
+              
+              <div className="grid gap-3 sm:grid-cols-2">
+                {TAJWEED_RULES.map(rule => {
+                  const val = selectedStudent.tajweed?.rules?.[rule] || 'غير مبدوء';
+                  return (
+                    <div key={rule} className="flex flex-col gap-3 p-4 bg-gray-50 hover:bg-gray-100/50 transition-colors rounded-2xl border border-gray-100">
+                      <span className="text-sm font-black text-gray-800">{rule}</span>
+                      <div className="flex bg-white border border-gray-200 rounded-xl p-1 shadow-sm mt-auto max-w-fit">
+                        <button 
+                          onClick={() => handleUpdateTajweed(rule, 'غير مبدوء')}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${val === 'غير مبدوء' ? 'bg-gray-100 text-gray-600 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                        >
+                          غير مبدوء
+                        </button>
+                        <button 
+                          onClick={() => handleUpdateTajweed(rule, 'قيد التعلم')}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${val === 'قيد التعلم' ? 'bg-amber-100 text-amber-700 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                        >
+                          قيد التعلم
+                        </button>
+                        <button 
+                          onClick={() => handleUpdateTajweed(rule, 'متقن')}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1 ${val === 'متقن' ? 'bg-emerald-100 text-emerald-700 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                        >
+                          متقن ✓
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
+          )}
+
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center">
@@ -712,5 +803,14 @@ export default function QuranPage() {
         />
       )}
     </div>
+  );
+}
+
+// ── Guard wrapper (auto-generated) ──
+export default function QuranPagePage() {
+  return (
+    <SchoolGuard>
+      <QuranPage />
+    </SchoolGuard>
   );
 }

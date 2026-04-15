@@ -1,4 +1,5 @@
-"use client";
+﻿"use client";
+import SchoolGuard from "@/components/layout/SchoolGuard";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -210,7 +211,7 @@ function RankCard({
 
 // ─── الصفحة الرئيسية ──────────────────────────────────────
 
-export default function PointsPage() {
+function PointsPage() {
   const { user, school, isPrincipal } = useAuth();
   const [teachers, setTeachers] = useState<AppUser[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>("all");
@@ -441,5 +442,14 @@ export default function PointsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Guard wrapper (auto-generated) ──
+export default function PointsPagePage() {
+  return (
+    <SchoolGuard>
+      <PointsPage />
+    </SchoolGuard>
   );
 }

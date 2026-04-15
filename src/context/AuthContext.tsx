@@ -6,16 +6,17 @@ import type { AppUser, School } from "@/lib/types";
 
 // Types compatible with existing app expectations
 interface AuthContextType {
-  user: any | null; // using any for quick migration
+  user: any | null;
   school: any | null;
   loading: boolean;
   role: string | null;
   isSuperAdmin: boolean;
   isPrincipal: boolean;
   isTeacher: boolean;
-  syncStatus: any; 
+  syncStatus: any;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  refreshSchool: () => Promise<void>; // تحديث بيانات المدرسة من Supabase
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -137,6 +138,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSchool(null);
   };
 
+  const refreshSchool = async (): Promise<void> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const { data: userData } = await supabase.from("users").select("school_id").eq("id", session.user.id).single();
+    if (userData?.school_id) {
+      const { data: schoolData } = await supabase.from("schools").select("*").eq("id", userData.school_id).single();
+      if (schoolData) setSchool(schoolData);
+    }
+  };
+
   const role = user?.role ?? null;
   const isSuperAdmin = role === "super_admin";
   const isPrincipal = role === "principal" || role === "super_admin";
@@ -158,6 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         syncStatus,
         login,
         logout,
+        refreshSchool,
       }}
     >
       {children}

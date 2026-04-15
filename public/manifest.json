@@ -1,0 +1,45 @@
+{
+  "name": "منصة المدارس القرآنية",
+  "short_name": "المدارس القرآنية",
+  "description": "نظام متكامل لإدارة المدارس القرآنية — تتبع الحفظ والطلاب والتقارير",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#16a34a",
+  "orientation": "portrait-primary",
+  "lang": "ar",
+  "dir": "rtl",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "الحصص اليومية",
+      "short_name": "الحصص",
+      "description": "تسجيل الحصة اليومية",
+      "url": "/app/sessions",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "إدارة الطلاب",
+      "short_name": "الطلاب",
+      "description": "ملفات الطلاب",
+      "url": "/app/students",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}

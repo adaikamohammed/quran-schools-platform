@@ -1,4 +1,5 @@
-"use client";
+﻿"use client";
+import SchoolGuard from "@/components/layout/SchoolGuard";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -111,9 +112,10 @@ function CovenantModal({
 
   return (
     <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      <motion.div key="covenant-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <motion.div
+        key="covenant-modal"
         initial={{ opacity: 0, y: 30, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 30 }}
@@ -275,7 +277,7 @@ function CovenantModal({
 
 // ─── الصفحة الرئيسية ──────────────────────────────────────
 
-export default function CovenantsPage() {
+function CovenantsPage() {
   const { user, school, isPrincipal } = useAuth();
   const [teachers, setTeachers] = useState<AppUser[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>("all");
@@ -534,5 +536,14 @@ export default function CovenantsPage() {
         />
       )}
     </div>
+  );
+}
+
+// ── Guard wrapper (auto-generated) ──
+export default function CovenantsPagePage() {
+  return (
+    <SchoolGuard>
+      <CovenantsPage />
+    </SchoolGuard>
   );
 }

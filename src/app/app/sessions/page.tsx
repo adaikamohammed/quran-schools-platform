@@ -1,4 +1,5 @@
 "use client";
+import SchoolGuard from "@/components/layout/SchoolGuard";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -86,9 +87,10 @@ interface StudentRowProps {
   record: DailyRecord;
   onChange: (patch: Partial<DailyRecord>) => void;
   sessionSurahId?: number;
+  enableTajweedTracking?: boolean;
 }
 
-function StudentRow({ student, record, onChange, sessionSurahId }: StudentRowProps) {
+function StudentRow({ student, record, onChange, sessionSurahId, enableTajweedTracking }: StudentRowProps) {
   const isAbsent = record.attendance === "غائب";
   const [expanded, setExpanded] = useState(false);
 
@@ -160,31 +162,62 @@ function StudentRow({ student, record, onChange, sessionSurahId }: StudentRowPro
             <div className="px-4 pb-4 space-y-4 bg-gray-50/80 border-t border-gray-100">
 
               {/* التقييم */}
-              <div className="pt-3">
-                <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2">تقييم التحفيظ</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {MEMORIZATION_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => onChange({ memorization: opt.value })}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
-                        record.memorization === opt.value
-                          ? `${opt.color} shadow-sm scale-105`
-                          : "bg-white border border-gray-200 text-gray-600 hover:border-gray-300"
-                      }`}
-                    >
-                      {opt.emoji} {opt.value}
-                    </button>
-                  ))}
-                  {record.memorization && (
-                    <button
-                      onClick={() => onChange({ memorization: null })}
-                      className="px-2 py-1.5 rounded-xl text-xs font-bold text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
+              <div className="pt-3 space-y-4 sm:space-y-0 sm:flex sm:gap-4">
+                <div className="flex-1">
+                  <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2">تقييم التحفيظ</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {MEMORIZATION_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => onChange({ memorization: opt.value })}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
+                          record.memorization === opt.value
+                            ? `${opt.color} shadow-sm scale-105`
+                            : "bg-white border border-gray-200 text-gray-600 hover:border-gray-300"
+                        }`}
+                      >
+                        {opt.emoji} {opt.value}
+                      </button>
+                    ))}
+                    {record.memorization && (
+                      <button
+                        onClick={() => onChange({ memorization: null })}
+                        className="px-2 py-1.5 rounded-xl text-xs font-bold text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {enableTajweedTracking && (
+                  <div className="flex-1 border-t sm:border-t-0 sm:border-r border-gray-100 pt-3 sm:pt-0 sm:pr-4">
+                    <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2 text-indigo-700">تقييم التجويد الفوري</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {MEMORIZATION_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => onChange({ tajweedEvaluation: opt.value })}
+                          className={`px-3 py-1.5 rounded-xl text-[11px] font-black transition-all ${
+                            record.tajweedEvaluation === opt.value
+                              ? `${opt.color} shadow-sm scale-105`
+                              : "bg-indigo-50/50 border border-indigo-100 text-indigo-600 hover:bg-indigo-100"
+                          }`}
+                        >
+                          {opt.value}
+                        </button>
+                      ))}
+                      {record.tajweedEvaluation && (
+                        <button
+                          onClick={() => onChange({ tajweedEvaluation: null })}
+                          className="px-2 py-1.5 rounded-xl text-xs font-bold text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* السورة — إذا لم تكن موحّدة على مستوى الحصة */}
@@ -395,7 +428,7 @@ function SessionSetup({
 
 // ─── الصفحة الرئيسية ──────────────────────────────────────
 
-export default function SessionsPage() {
+function SessionsPage() {
   const { user, school, isPrincipal } = useAuth();
   const [teachers, setTeachers] = useState<AppUser[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>("");
@@ -474,6 +507,7 @@ export default function SessionsPage() {
             studentId: s.id,
             attendance: "" as AttendanceStatus,
             memorization: null,
+            tajweedEvaluation: null,
             review: null,
             behavior: null,
             notes: "",
@@ -492,6 +526,7 @@ export default function SessionsPage() {
             studentId: s.id,
             attendance: "" as AttendanceStatus,
             memorization: null,
+            tajweedEvaluation: null,
             review: null,
             behavior: null,
             notes: "",
@@ -755,6 +790,7 @@ export default function SessionsPage() {
                       studentId: student.id,
                       attendance: "" as AttendanceStatus,
                       memorization: null,
+                      tajweedEvaluation: null,
                       review: null,
                       behavior: null,
                     };
@@ -765,6 +801,7 @@ export default function SessionsPage() {
                         record={rec}
                         onChange={(patch) => updateRecord(student.id, patch)}
                         sessionSurahId={surahId}
+                        enableTajweedTracking={school?.settings?.enableTajweedTracking ?? false}
                       />
                     );
                   })}
@@ -839,5 +876,14 @@ export default function SessionsPage() {
         </>
       )}
     </div>
+  );
+}
+
+// ── Guard wrapper (auto-generated) ──
+export default function SessionsPagePage() {
+  return (
+    <SchoolGuard>
+      <SessionsPage />
+    </SchoolGuard>
   );
 }

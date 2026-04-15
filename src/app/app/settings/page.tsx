@@ -1,19 +1,133 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { getDB } from "@/lib/storage/db";
 import { saveSchool } from "@/lib/storage/db";
 import type { School } from "@/lib/types";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Settings, Save, Loader2, Building2, MapPin,
-  Mail, Phone, Calendar, Palette, CheckCircle2,
-  AlertTriangle, Globe, BookOpen, DollarSign,
+  Settings, Save, Loader2, Building2,
+  Mail, Phone, Calendar, CheckCircle2,
+  AlertTriangle, Globe, DollarSign, X, Search, ChevronDown, BookOpen
 } from "lucide-react";
+import { COUNTRIES_LIST, getDialCode, type CountryInfo } from "@/lib/countries";
+import { AcademicYearPicker } from "@/components/ui/AcademicYearPicker";
 
+// ─── مكوّن اختيار الدولة المنبثقة ──────────────────────────────────
+function CountryPickerModal({
+  value,
+  onChange,
+  onClose,
+}: {
+  value: string;
+  onChange: (country: CountryInfo) => void;
+  onClose: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const filtered = COUNTRIES_LIST.filter((c) =>
+    c.name.includes(search) || c.dial.includes(search)
+  );
+
+  return (
+    <>
+      {/* Backdrop */}
+      <motion.div
+        key="backdrop"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+      />
+      {/* Modal */}
+      <motion.div
+        key="modal"
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      >
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden" dir="rtl">
+          {/* Header */}
+          <div className="flex items-center justify-between p-5 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[var(--color-primary)]/10 flex items-center justify-center">
+                <Globe className="w-5 h-5 text-[var(--color-primary)]" />
+              </div>
+              <div>
+                <h3 className="font-black text-gray-900 text-base" style={{ fontFamily: "var(--font-headline)" }}>
+                  اختر دولتك
+                </h3>
+                <p className="text-xs text-gray-400">سيتم تعيين رمز الاتصال تلقائياً</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+            >
+              <X className="w-4 h-4 text-gray-600" />
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="p-4 border-b border-gray-100">
+            <div className="relative">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                ref={inputRef}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="ابحث عن دولتك..."
+                className="w-full pr-9 pl-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[var(--color-primary)] bg-gray-50"
+              />
+            </div>
+          </div>
+
+          {/* Countries List */}
+          <div className="overflow-y-auto max-h-72 p-2 space-y-0.5">
+            {filtered.length === 0 ? (
+              <p className="text-center text-gray-400 text-sm py-8">لا توجد نتائج</p>
+            ) : (
+              filtered.map((country) => (
+                <button
+                  key={country.name}
+                  onClick={() => { onChange(country); onClose(); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all hover:bg-[var(--color-primary)]/5 ${
+                    value === country.name
+                      ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
+                      : "text-gray-700"
+                  }`}
+                >
+                  <span className="text-xl">{country.flag}</span>
+                  <span className="flex-1 text-right">{country.name}</span>
+                  {country.dial && (
+                    <span className="text-xs font-black text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg" dir="ltr">
+                      {country.dial}
+                    </span>
+                  )}
+                  {value === country.name && (
+                    <CheckCircle2 className="w-4 h-4 text-[var(--color-primary)] shrink-0" />
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </>
+  );
+}
+
+// ─── الصفحة الرئيسية ──────────────────────────────────────────────
 export default function SettingsPage() {
-  const { school, user, role } = useAuth();
+  const { school, role } = useAuth();
   const [form, setForm] = useState({
     name: "",
     city: "",
@@ -21,12 +135,15 @@ export default function SettingsPage() {
     directorName: "",
     email: "",
     phone: "",
+    academicYear: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
     seasonStartDate: "",
     priceAkabir: "1500",
     priceAsaghir: "1200",
+    enableTajweedTracking: false,
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [countryModalOpen, setCountryModalOpen] = useState(false);
 
   useEffect(() => {
     if (school) {
@@ -37,14 +154,28 @@ export default function SettingsPage() {
         directorName: school.directorName ?? "",
         email: school.email ?? "",
         phone: school.phone ?? "",
+        academicYear: school.settings?.academicYear ?? `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
         seasonStartDate: school.seasonStartDate ?? "",
         priceAkabir: school.settings?.prices?.renewal?.["فئة الأكابر"]?.toString() ?? "1500",
         priceAsaghir: school.settings?.prices?.renewal?.["فئة الأصاغر"]?.toString() ?? "1200",
+        enableTajweedTracking: school.settings?.enableTajweedTracking ?? false,
       });
     }
   }, [school]);
 
   const up = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  const handleCountrySelect = (country: CountryInfo) => {
+    const dial = country.dial ? country.dial + " " : "";
+    setForm((f) => ({
+      ...f,
+      country: country.name,
+      // تحديث الهاتف برمز الدولة الجديدة إذا كان فارغاً أو يحتوي فقط على رمز قديم
+      phone: !f.phone.trim() || f.phone.trim().startsWith("+")
+        ? dial
+        : f.phone,
+    }));
+  };
 
   const handleSave = async () => {
     if (!school) return;
@@ -60,6 +191,8 @@ export default function SettingsPage() {
       seasonStartDate: form.seasonStartDate || undefined,
       settings: {
         ...school.settings,
+        academicYear: form.academicYear,
+        enableTajweedTracking: form.enableTajweedTracking,
         prices: {
           renewal: {
             "فئة الأكابر": Number(form.priceAkabir) || 1500,
@@ -76,6 +209,10 @@ export default function SettingsPage() {
   };
 
   const isAdmin = role === "super_admin" || role === "principal";
+
+  // الدولة المختارة مع علمها
+  const selectedCountry = COUNTRIES_LIST.find((c) => c.name === form.country);
+  const dialCode = getDialCode(form.country);
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
@@ -143,13 +280,29 @@ export default function SettingsPage() {
             </div>
             <div>
               <label className="label-xs">الدولة</label>
-              <input
-                value={form.country}
-                onChange={(e) => up("country", e.target.value)}
+              {/* زر اختيار الدولة المنبثق */}
+              <button
+                type="button"
+                onClick={() => isAdmin && setCountryModalOpen(true)}
                 disabled={!isAdmin}
-                placeholder="الجزائر"
-                className="input-field text-sm py-2.5 mt-1.5 disabled:bg-gray-50 disabled:cursor-not-allowed"
-              />
+                className={`
+                  w-full mt-1.5 flex items-center gap-3 px-3 py-2.5 rounded-xl border text-sm font-bold text-right
+                  transition-all duration-200
+                  ${isAdmin
+                    ? "bg-white border-[var(--color-border)] hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 cursor-pointer"
+                    : "bg-gray-50 border-gray-200 cursor-not-allowed opacity-70"
+                  }
+                `}
+              >
+                <span className="text-xl">{selectedCountry?.flag ?? "🌍"}</span>
+                <span className="flex-1 text-right">{form.country || "اختر الدولة..."}</span>
+                {dialCode && (
+                  <span className="text-xs text-gray-400 font-black bg-gray-100 px-2 py-0.5 rounded-lg" dir="ltr">
+                    {dialCode.trim()}
+                  </span>
+                )}
+                {isAdmin && <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />}
+              </button>
             </div>
           </div>
           <div>
@@ -185,12 +338,19 @@ export default function SettingsPage() {
             />
           </div>
           <div>
-            <label className="label-xs">رقم الهاتف</label>
+            <label className="label-xs flex items-center gap-2">
+              رقم الهاتف
+              {dialCode && (
+                <span className="text-[10px] font-black text-[var(--color-primary)] bg-[var(--color-primary)]/10 px-2 py-0.5 rounded-full" dir="ltr">
+                  {dialCode.trim()} — {form.country}
+                </span>
+              )}
+            </label>
             <input
               value={form.phone}
               onChange={(e) => up("phone", e.target.value)}
               disabled={!isAdmin}
-              placeholder="+213..."
+              placeholder={dialCode ? `${dialCode.trim()} XXXXXXXXX` : "+213..."}
               className="input-field text-sm py-2.5 mt-1.5 disabled:bg-gray-50 disabled:cursor-not-allowed"
               dir="ltr"
             />
@@ -204,7 +364,17 @@ export default function SettingsPage() {
           <Calendar className="w-4 h-4 text-[var(--color-primary)]" />
           <p className="text-sm font-black text-gray-700">الموسم الدراسي</p>
         </div>
-        <div className="p-5">
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="label-xs">السنة الدراسية</label>
+            <div className="mt-1.5">
+              <AcademicYearPicker
+                value={form.academicYear}
+                onChange={(y) => up("academicYear", y)}
+                disabled={!isAdmin}
+              />
+            </div>
+          </div>
           <div>
             <label className="label-xs">تاريخ بداية الموسم</label>
             <input
@@ -222,7 +392,7 @@ export default function SettingsPage() {
       <div className="bg-white rounded-2xl border border-[var(--color-border)] overflow-hidden">
         <div className="flex items-center gap-2 p-4 border-b border-gray-100 bg-gray-50">
           <DollarSign className="w-4 h-4 text-[var(--color-primary)]" />
-          <p className="text-sm font-black text-gray-700">أسعار الاشتراكات (دج)</p>
+          <p className="text-sm font-black text-gray-700">أسعار الاشتراكات</p>
         </div>
         <div className="p-5 grid grid-cols-2 gap-4">
           <div>
@@ -247,6 +417,38 @@ export default function SettingsPage() {
               className="input-field text-sm py-2.5 mt-1.5 text-center disabled:bg-gray-50 disabled:cursor-not-allowed"
             />
           </div>
+          <div className="col-span-2">
+            <p className="text-[11px] text-gray-400 font-medium border-r-2 border-indigo-200 pr-2">
+              فئة الأصاغر تكون بسعر مخفض مقارنةً بالأكابر. المبالغ بالعملة المحلية لدولتك.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* الميزات المتقدمة */}
+      <div className="bg-white rounded-2xl border border-[var(--color-border)] overflow-hidden">
+        <div className="flex items-center gap-2 p-4 border-b border-gray-100 bg-gray-50">
+          <BookOpen className="w-4 h-4 text-[var(--color-primary)]" />
+          <p className="text-sm font-black text-gray-700">الميزات المتقدمة (اختياري)</p>
+        </div>
+        <div className="p-5 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
+          <label className="flex items-start gap-4 cursor-pointer group">
+            <div className="mt-0.5">
+              <input
+                type="checkbox"
+                checked={form.enableTajweedTracking}
+                onChange={(e) => setForm((f) => ({ ...f, enableTajweedTracking: e.target.checked }))}
+                disabled={!isAdmin}
+                className="w-4 h-4 text-[var(--color-primary)] bg-gray-100 border-gray-300 rounded focus:ring-[var(--color-primary)] focus:ring-2 disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <p className="text-sm font-black text-gray-900 group-hover:text-[var(--color-primary)] transition-colors">تفعيل نظام التجويد</p>
+              <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                في حال تفعيله، سيظهر حقل إضافي لتقييم تجويد الطالب أثناء تسجيل الحصص اليومية، بالإضافة إلى سجل تراكمي شامل يضم أحكام التجويد الأساسية داخل صفحة متابعة السور لكل طالب.
+              </p>
+            </div>
+          </label>
         </div>
       </div>
 
@@ -258,6 +460,17 @@ export default function SettingsPage() {
         <div className="flex justify-between"><span>آخر تحديث</span><span>{school?.updatedAt ? new Date(school.updatedAt).toLocaleDateString("ar-DZ") : "—"}</span></div>
         <div className="flex justify-between"><span>وضع التخزين</span><span className="text-emerald-600 font-bold">محلي (IndexedDB) ✓</span></div>
       </div>
+
+      {/* نافذة اختيار الدولة */}
+      <AnimatePresence>
+        {countryModalOpen && (
+          <CountryPickerModal
+            value={form.country}
+            onChange={handleCountrySelect}
+            onClose={() => setCountryModalOpen(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

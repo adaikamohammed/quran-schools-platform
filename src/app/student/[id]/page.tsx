@@ -14,13 +14,13 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { getDB } from "@/lib/storage/db";
-import type { Student, DailySession, SurahProgress } from "@/lib/types";
+import type { Student, DailySession, SurahProgress, TimetableEntry } from "@/lib/types";
 import { surahs } from "@/lib/surahs";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen, Phone, CheckCircle2, AlertTriangle,
   Loader2, KeyRound, Star, Calendar, Users2, BookCheck,
-  Shield,
+  Shield, MessageCircle, Map, Grid, CheckCircle, Clock
 } from "lucide-react";
 
 // ─── مفتاح التحقق المحفوظ (localStorage) ─────────────────
@@ -146,10 +146,11 @@ function PhoneVerification({
 
 // ─── مكون: بيانات الطالب ─────────────────────────────────
 
-function StudentView({ student, sessions, surahProgress }: {
+function StudentView({ student, sessions, surahProgress, timetable }: {
   student: Student;
   sessions: DailySession[];
   surahProgress: SurahProgress[];
+  timetable: TimetableEntry[];
 }) {
   const records = useMemo(() =>
     sessions.flatMap(s => s.records.filter(r => r.studentId === student.id)),
@@ -178,6 +179,23 @@ function StudentView({ student, sessions, surahProgress }: {
   lastRecords.forEach(r => {
     if (r.memorization) evalSummary[r.memorization] = (evalSummary[r.memorization] ?? 0) + 1;
   });
+
+  // 1. رسالة المعلم الحديثة وتحدي المنزل
+  const latestSession = sessions.length > 0 ? sessions[0] : null; // Already sorted
+  const latestRecord = latestSession ? latestSession.records.find(r => r.studentId === student.id) : null;
+  const homeChallenge = latestRecord?.notes?.match(/(مراجعة|تحدي|واجب|حفظ)/) ? latestRecord.notes : null;
+
+  // 2. خريطة الحضور لآخر 30 حصة
+  const last30Sessions = sessions.slice(0, 30).slice().reverse();
+
+  // 3. شجرة جزء عم
+  const juzAmmaSurahs = [1, ...Array.from({length: 37}, (_, i) => 114 - i)];
+  const getSurahStatus = (id: number) => surahProgress.find(s => s.surahId === id)?.status || 'غير محفوظة';
+  const getSurahColor = (status: string) => {
+    if (["تم الحفظ", "تمت المراجعة", "محفوظة", "مُتقنة"].includes(status)) return 'bg-emerald-500 border-emerald-600 text-white';
+    if (["قيد الحفظ", "إعادة حفظ"].includes(status)) return 'bg-amber-400 border-amber-500 text-white';
+    return 'bg-gray-100 border-gray-200 text-gray-500';
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-10" dir="rtl">
@@ -222,118 +240,149 @@ function StudentView({ student, sessions, surahProgress }: {
 
       <div className="max-w-lg mx-auto px-4 mt-5 space-y-4">
 
-        {/* الحضور */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-          <h2 className="text-sm font-black text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
-            سجل الحضور (إجمالي)
-          </h2>
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="bg-emerald-50 rounded-xl p-3 text-center">
-              <p className="text-xl font-black text-emerald-700" style={{ fontFamily: "var(--font-headline)" }}>{presentCount}</p>
-              <p className="text-[10px] text-emerald-600 font-medium mt-0.5">حاضر</p>
-            </div>
-            <div className="bg-red-50 rounded-xl p-3 text-center">
-              <p className="text-xl font-black text-red-600" style={{ fontFamily: "var(--font-headline)" }}>{absentCount}</p>
-              <p className="text-[10px] text-red-500 font-medium mt-0.5">غائب</p>
-            </div>
-            <div className="bg-blue-50 rounded-xl p-3 text-center">
-              <p className="text-xl font-black text-blue-700" style={{ fontFamily: "var(--font-headline)" }}>{sessions.length}</p>
-              <p className="text-[10px] text-blue-600 font-medium mt-0.5">حصة</p>
-            </div>
-          </div>
-          {records.length > 0 && (
-            <div>
-              <div className="flex justify-between text-xs text-gray-400 mb-1">
-                <span>نسبة الحضور</span>
-                <span>{attendanceRate}%</span>
-              </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-l from-[var(--color-primary)] to-emerald-400 rounded-full transition-all"
-                  style={{ width: `${attendanceRate}%` }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* آخر 7 حصص */}
-        {sessions.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <h2 className="text-sm font-black text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <BookOpen className="w-4 h-4" />
-              آخر الحصص
+        {/* 1. رسالة المعلم وملاحظة اليوم */}
+        {latestRecord && (latestRecord.notes || latestRecord.memorization) && (
+          <motion.div initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-5 shadow-sm">
+            <h2 className="text-sm font-black text-blue-800 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <MessageCircle className="w-4 h-4" />
+              رسالة اليوم من الشيخ
+              {latestSession && <span className="text-[10px] font-medium text-blue-600 mr-auto bg-blue-100/50 px-2 py-0.5 rounded-full">{latestSession.date}</span>}
             </h2>
-            <div className="divide-y divide-gray-50">
-              {sessions.slice(0, 7).map(ses => {
-                const rec = ses.records.find(r => r.studentId === student.id);
-                if (!rec) return null;
-                return (
-                  <div key={ses.id} className="flex items-center gap-3 py-2.5">
-                    <span className="text-xs text-gray-400 font-mono w-20 shrink-0">{ses.date}</span>
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                      rec.attendance === "حاضر" ? "bg-emerald-100 text-emerald-700" :
-                      rec.attendance === "غائب" ? "bg-red-100 text-red-600" :
-                      "bg-amber-100 text-amber-700"
-                    }`}>
-                      {rec.attendance || "—"}
-                    </span>
-                    {rec.memorization && (
-                      <span className="text-xs text-gray-500 font-medium">{rec.memorization}</span>
-                    )}
-                    {rec.notes && (
-                      <span className="text-xs text-gray-400 mr-auto truncate max-w-[120px]">{rec.notes}</span>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-100/50">
+              {latestRecord.notes && (
+                <p className="text-sm text-gray-700 leading-relaxed font-medium mb-3">"{latestRecord.notes}"</p>
+              )}
+              {latestRecord.memorization && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-gray-500">تقييم التحفيظ:</span>
+                  <span className="font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md">{latestRecord.memorization}</span>
+                </div>
+              )}
             </div>
+          </motion.div>
+        )}
+
+        {/* 4. تحدي المنزل */}
+        {homeChallenge && (
+          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-200 p-5 shadow-sm">
+            <h2 className="text-sm font-black text-amber-800 uppercase tracking-wider mb-2 flex items-center gap-2">
+              <Star className="w-4 h-4" />
+              مهمة المنزل
+            </h2>
+            <p className="text-sm text-amber-900 leading-relaxed font-bold mb-4">
+              "{homeChallenge}"
+            </p>
+            <button
+              onClick={(e) => {
+                const btn = e.currentTarget;
+                btn.innerHTML = '<span class="flex items-center gap-2 justify-center"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg> تم إنجاز المهمة بنجاح!</span>';
+                btn.className = "w-full h-11 bg-emerald-500 text-white font-bold rounded-xl transition-colors cursor-default";
+                btn.disabled = true;
+              }}
+              className="w-full h-11 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              <CheckCircle className="w-4 h-4" />
+              تأكيد إنجاز المهمة
+            </button>
           </div>
         )}
 
-        {/* تقييم التحفيظ */}
-        {Object.keys(evalSummary).length > 0 && (
+        {/* 3. سجل الحضور ورسم بياني لآخر 30 حصة */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+          <h2 className="text-sm font-black text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            الحضور آخر 30 حصة
+          </h2>
+          {last30Sessions.length > 0 ? (
+            <div>
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                <div className="bg-emerald-50 rounded-xl p-3 text-center">
+                  <p className="text-xl font-black text-emerald-700" style={{ fontFamily: "var(--font-headline)" }}>{presentCount}</p>
+                  <p className="text-[10px] text-emerald-600 font-medium mt-0.5">إجمالي الحضور</p>
+                </div>
+                <div className="bg-red-50 rounded-xl p-3 text-center">
+                  <p className="text-xl font-black text-red-600" style={{ fontFamily: "var(--font-headline)" }}>{absentCount}</p>
+                  <p className="text-[10px] text-red-500 font-medium mt-0.5">إجمالي الغياب</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between text-xs font-bold text-gray-500 mb-3">
+                <span>خريطة الحضور</span>
+                <span>{attendanceRate}%</span>
+              </div>
+              <div className="bg-gray-50 border border-gray-100 p-3 rounded-xl flex flex-wrap gap-1.5" dir="ltr">
+                {last30Sessions.map(ses => {
+                  const rec = ses.records.find(r => r.studentId === student.id);
+                  const isPresent = rec && ["حاضر", "متأخر", "تعويض"].includes(rec.attendance);
+                  const isAbsent  = rec?.attendance === "غائب";
+                  const bg = isPresent ? 'bg-emerald-500' : isAbsent ? 'bg-red-500' : 'bg-gray-200';
+                  return (
+                    <div key={ses.id} title={`${ses.date}: ${rec?.attendance || "غير مسجل"}`} className={`w-5 h-5 sm:w-6 sm:h-6 rounded-md ${bg} shadow-sm transition-transform hover:scale-110`} />
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <p className="text-center text-sm text-gray-400 py-4">لم يتم تسجيل حصص بعد.</p>
+          )}
+        </div>
+
+        {/* 2. شجرة الحفظ المرئية (جزء عم والفاتحة) */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+          <h2 className="text-sm font-black text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <Map className="w-4 h-4" />
+            شجرة الحفظ المرئية
+          </h2>
+          <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+            {juzAmmaSurahs.map(id => {
+              const surah = surahs.find(s => s.id === id);
+              if (!surah) return null;
+              const status = getSurahStatus(id);
+              return (
+                <div key={id} title={`${surah.name} : ${status}`} className={`flex flex-col items-center justify-center p-2 rounded-xl border ${getSurahColor(status)} transition-colors duration-300`}>
+                  <span className="text-[10px] sm:text-xs font-bold leading-tight truncate w-full text-center">{surah.name}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-4 mt-5 pt-4 border-t border-gray-50 text-[10px] sm:text-xs text-gray-500 font-medium">
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-emerald-500 border border-emerald-600"/>محفوظة متقنة</div>
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-amber-400 border border-amber-500"/>قيد الحفظ</div>
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-gray-100 border border-gray-200"/>لم تحفظ بعد</div>
+          </div>
+        </div>
+
+        {/* جدول الحصص */}
+        {timetable.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <h2 className="text-sm font-black text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Star className="w-4 h-4" />
-              تقييم التحفيظ (آخر 5 حصص)
+            <h2 className="text-sm font-black text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              أوقات دوام الفوج
             </h2>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(evalSummary).map(([e, n]) => (
-                <div key={e} className="flex items-center gap-1.5 bg-gray-50 rounded-xl px-3 py-2">
-                  <span className="text-sm font-black text-gray-800">{e}</span>
-                  <span className="text-xs text-gray-400 font-bold">{n}×</span>
+            <div className="space-y-2">
+              {timetable.map(entry => (
+                <div key={entry.id}
+                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-100"
+                  style={{ borderRightWidth: 3, borderRightColor: entry.color || '#3b82f6' }}>
+                  <div>
+                    <p className="text-sm font-black text-gray-800">{entry.dayOfWeek}</p>
+                    {entry.subject && <p className="text-xs text-gray-500">{entry.subject}</p>}
+                  </div>
+                  <div className="mr-auto flex items-center gap-1.5 text-sm font-bold text-gray-700" dir="ltr">
+                    <Clock className="w-3.5 h-3.5 text-gray-400" />
+                    {entry.startTime} — {entry.endTime}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* السور المحفوظة */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-          <h2 className="text-sm font-black text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-            <BookCheck className="w-4 h-4" />
-            السور المحفوظة ({memorizedSurahs.length})
-          </h2>
-          {memorizedSurahs.length === 0 ? (
-            <p className="text-gray-400 text-sm text-center py-4">لم يتم تسجيل سور محفوظة بعد</p>
-          ) : (
-            <div className="flex flex-wrap gap-1.5">
-              {memorizedSurahs.map(sp => (
-                <span key={sp.id} className="text-xs font-bold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full">
-                  {sp.surahName}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ملاحظات المعلم */}
+        {/* ملاحظات عامة ثابتة للمعلم */}
         {student.notes && (
-          <div className="bg-amber-50 rounded-2xl border border-amber-100 p-5">
-            <p className="text-xs font-black text-amber-600 uppercase tracking-wider mb-2">ملاحظات المعلم</p>
-            <p className="text-sm text-amber-800 leading-relaxed">{student.notes}</p>
+          <div className="bg-gray-50 rounded-2xl border border-gray-100 p-5">
+            <p className="text-xs font-black text-gray-500 uppercase tracking-wider mb-2">ملاحظة عامة عن الطالب</p>
+            <p className="text-sm text-gray-700 leading-relaxed font-medium">{student.notes}</p>
           </div>
         )}
 
@@ -352,6 +401,7 @@ export default function PublicStudentPage() {
   const [student, setStudent] = useState<Student | null>(null);
   const [sessions, setSessions] = useState<DailySession[]>([]);
   const [surahProgress, setSurahProgress] = useState<SurahProgress[]>([]);
+  const [timetable, setTimetable] = useState<TimetableEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [verified, setVerified] = useState(false);
@@ -363,16 +413,22 @@ export default function PublicStudentPage() {
       if (!s) { setNotFound(true); setLoading(false); return; }
       setStudent(s);
 
-      const [sess, surah] = await Promise.all([
+      const [sess, surah, tmt] = await Promise.all([
         db.sessions.where("teacherId").equals(s.teacherId).toArray()
           .then(all => all.filter(ses => ses.records.some(r => r.studentId === s.id))
             .sort((a, b) => b.date.localeCompare(a.date))
           ),
         db.surahProgress.where("studentId").equals(s.id).toArray(),
+        db.timetables.where("groupName").equals(s.groupName).toArray()
+          .then(entries => entries.sort((a, b) => {
+            const days = ["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+            return days.indexOf(a.dayOfWeek) - days.indexOf(b.dayOfWeek);
+          })),
       ]);
 
       setSessions(sess);
       setSurahProgress(surah);
+      setTimetable(tmt);
 
       // تحقق من التحقق المحفوظ
       setVerified(isVerifiedLocally(id));
@@ -413,5 +469,5 @@ export default function PublicStudentPage() {
     );
   }
 
-  return <StudentView student={student} sessions={sessions} surahProgress={surahProgress} />;
+  return <StudentView student={student} sessions={sessions} surahProgress={surahProgress} timetable={timetable} />;
 }

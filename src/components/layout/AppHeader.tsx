@@ -1,8 +1,9 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 import SyncIndicator from "./SyncIndicator";
-import { Menu, Bell, Search, Home } from "lucide-react";
+import { Menu, Bell, Home, Moon, Sun } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
@@ -17,7 +18,9 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
   "/app/covenants": { title: "العهود والعقوبات", subtitle: "إدارة الالتزام والانضباط" },
   "/app/reports": { title: "التقارير اليومية", subtitle: "تقارير المعلمين والإدارة" },
   "/app/student-history": { title: "سجل الطالب", subtitle: "التاريخ الكامل لكل طالب" },
-  "/app/notifications": { title: "مركز الإشعارات", subtitle: "تنبيهات وإشعارات النظام" },
+  "/app/notifications": { title: "مركز الإشعارات", subtitle: "تنبيهات النظام والمتابعة" },
+  "/app/settings/backup": { title: "النسخ الاحتياطي", subtitle: "تصدير واستيراد بيانات المدرسة" },
+  "/app/settings/features": { title: "تخصيص الواجهة", subtitle: "اختر الصفحات التي تظهر في الشريط الجانبي" },
   "/app/communication": { title: "قناة التواصل", subtitle: "التواصل مع أولياء الأمور" },
   "/app/points": { title: "نظام النقاط", subtitle: "مكافآت وترتيب الطلاب" },
   "/app/ranking": { title: "ترتيب الطلاب", subtitle: "لوحة الشرف الأسبوعية" },
@@ -28,16 +31,27 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
   "/app/updates": { title: "تحديثات النظام", subtitle: "آخر تحديثات المنصة" },
   "/app/profile": { title: "الملف الشخصي", subtitle: "بياناتك الشخصية" },
   "/app/settings": { title: "إعدادات المدرسة", subtitle: "تخصيص وإعداد النظام" },
+  "/app/guide": { title: "دليل المنصة", subtitle: "تعرّف على كيفية استخدام المنصة" },
+  "/app/teachers": { title: "أفواج المدرسة", subtitle: "إدارة الفصول والمعلمين" },
+  "/app/schools-admin": { title: "المدارس المسجلة", subtitle: "كل المدارس في المنصة" },
+  "/app/school-requests": { title: "طلبات التسجيل", subtitle: "مراجعة طلبات المدارس الجديدة" },
 };
 
 function getPageInfo(pathname: string) {
-  // تطابق دقيق أولاً
   if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
-  // تطابق جزئي (مسارات فرعية)
   for (const [key, val] of Object.entries(PAGE_TITLES)) {
     if (pathname.startsWith(key) && key !== "/app") return val;
   }
   return { title: "لوحة التحكم", subtitle: "" };
+}
+
+// ─── تحية ديناميكية ────────────────────────────────────────
+function getGreeting(name?: string | null): string {
+  const hour = new Date().getHours();
+  const firstName = name?.split(" ")[0] ?? "";
+  if (hour < 12) return `صباح الخير${firstName ? `، ${firstName}` : ""}`;
+  if (hour < 17) return `مساء الخير${firstName ? `، ${firstName}` : ""}`;
+  return `مساء النور${firstName ? `، ${firstName}` : ""}`;
 }
 
 // ─── Props ────────────────────────────────────────────────
@@ -49,41 +63,49 @@ interface AppHeaderProps {
 // ─── المكوّن ──────────────────────────────────────────────
 
 export default function AppHeader({ onMenuToggle }: AppHeaderProps) {
-  const { user, school } = useAuth();
+  const { user } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const pathname = usePathname();
   const pageInfo = getPageInfo(pathname);
+  const isHome = pathname === "/app";
 
   return (
-    <header className="sticky top-0 z-20 bg-white/90 backdrop-blur-xl border-b border-[var(--color-border)] px-4 sm:px-6">
+    <header className="sticky top-0 z-20 bg-white/90 dark:bg-[#13161f]/90 backdrop-blur-xl border-b border-[var(--color-border)] dark:border-white/8 px-4 sm:px-6 transition-colors duration-300">
       <div className="flex items-center justify-between h-16 gap-4">
 
-        {/* Right: Menu toggle + Breadcrumb */}
+        {/* Right: Menu toggle + Title */}
         <div className="flex items-center gap-3 min-w-0">
           {/* Mobile menu button */}
           <button
+            id="mobile-menu-btn"
             onClick={onMenuToggle}
-            className="lg:hidden w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors shrink-0"
+            className="lg:hidden w-9 h-9 rounded-xl bg-gray-100 dark:bg-white/8 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/15 hover:text-gray-900 dark:hover:text-white transition-colors"
             aria-label="القائمة"
           >
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Page title */}
+          {/* Page title / Greeting */}
           <motion.div
             key={pathname}
-            initial={{ opacity: 0, x: 10 }}
+            initial={{ opacity: 0, x: 12 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.25 }}
             className="min-w-0"
           >
             <h1
-              className="text-base font-black text-gray-900 leading-tight truncate"
+              className="text-base font-black text-gray-900 dark:text-white leading-tight truncate"
               style={{ fontFamily: "var(--font-headline)" }}
             >
-              {pageInfo.title}
+              {isHome ? getGreeting(user?.displayName) : pageInfo.title}
             </h1>
-            {pageInfo.subtitle && (
-              <p className="text-xs text-gray-400 font-medium hidden sm:block">
+            {pageInfo.subtitle && !isHome && (
+              <p className="text-xs text-[var(--color-muted-foreground)] font-medium hidden sm:block">
+                {pageInfo.subtitle}
+              </p>
+            )}
+            {isHome && (
+              <p className="text-xs text-[var(--color-muted-foreground)] font-medium hidden sm:block">
                 {pageInfo.subtitle}
               </p>
             )}
@@ -96,29 +118,51 @@ export default function AppHeader({ onMenuToggle }: AppHeaderProps) {
           {/* Sync indicator */}
           <SyncIndicator />
 
-          {/* Notifications */}
+          {/* Dark mode toggle */}
           <button
-            className="relative w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors"
+            id="header-theme-toggle"
+            onClick={toggleTheme}
+            title={isDark ? "الوضع الفاتح" : "الوضع الداكن"}
+            className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-white/8 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/15 hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            {isDark
+              ? <Sun className="w-4.5 h-4.5 text-amber-400" />
+              : <Moon className="w-4.5 h-4.5 text-indigo-500" />
+            }
+          </button>
+
+          {/* Notifications */}
+          <Link
+            href="/app/notifications"
+            id="notifications-btn"
+            className="relative w-9 h-9 rounded-xl bg-gray-100 dark:bg-white/8 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/15 hover:text-gray-900 dark:hover:text-white transition-colors"
             aria-label="الإشعارات"
+            title="مركز الإشعارات"
           >
             <Bell className="w-4.5 h-4.5" />
-            {/* badge */}
-            <span className="absolute top-1.5 left-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
-          </button>
+            {pathname !== "/app/notifications" && (
+              <span className="absolute top-1.5 left-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white dark:ring-[#13161f]" />
+            )}
+          </Link>
 
           {/* Public site link */}
           <Link
             href="/"
-            className="hidden sm:flex w-9 h-9 rounded-xl bg-gray-100 items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors"
+            className="hidden sm:flex w-9 h-9 rounded-xl bg-gray-100 dark:bg-white/8 items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/15 hover:text-gray-900 dark:hover:text-white transition-colors"
             title="الواجهة العامة"
           >
             <Home className="w-4 h-4" />
           </Link>
 
           {/* User avatar */}
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center text-white font-black text-sm cursor-pointer hover:opacity-90 transition-opacity shadow-sm">
+          <Link
+            href="/app/profile"
+            id="user-avatar-btn"
+            className="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center text-white font-black text-sm hover:opacity-90 transition-opacity shadow-sm"
+            title="الملف الشخصي"
+          >
             {user?.displayName?.[0] ?? "م"}
-          </div>
+          </Link>
         </div>
       </div>
     </header>

@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getDB } from "@/lib/storage/db";
 import type { AppUser } from "@/lib/types";
-import { motion } from "framer-motion";
 import {
   User, Save, Loader2, CheckCircle2, Lock,
-  Phone, Mail, Calendar, BookOpen, Edit3,
-  Shield, Eye, EyeOff, KeyRound,
+  Phone, KeyRound,
 } from "lucide-react";
+import { PhotoPicker } from "@/components/ui/PhotoPicker";
+import PushNotificationManager from "@/components/notifications/PushNotificationManager";
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "مدير النظام",
@@ -28,6 +28,7 @@ export default function ProfilePage() {
     certifications: "",
     groupName: "",
   });
+  const [photoURL, setPhotoURL] = useState<string | undefined>(undefined);
   const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
   const [showPw, setShowPw] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -46,6 +47,7 @@ export default function ProfilePage() {
         certifications: user.certifications ?? "",
         groupName: user.groupName ?? "",
       });
+      setPhotoURL(user.photoURL);
     }
   }, [user]);
 
@@ -64,6 +66,7 @@ export default function ProfilePage() {
       bio: form.bio.trim() || undefined,
       certifications: form.certifications.trim() || undefined,
       groupName: form.groupName.trim() || undefined,
+      photoURL: photoURL || undefined,
       updatedAt: new Date().toISOString(),
     };
     await db.users.put(updated);
@@ -116,13 +119,19 @@ export default function ProfilePage() {
       {/* بطاقة المستخدم */}
       <div className="bg-gradient-to-l from-[var(--color-primary)] to-[var(--color-primary-dark)] rounded-2xl p-5 text-white">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center text-2xl font-black" style={{ fontFamily: "var(--font-headline)" }}>
-            {user.displayName?.[0] ?? "م"}
+          <div className="relative shrink-0">
+            <PhotoPicker
+              currentPhoto={photoURL}
+              displayName={user.displayName}
+              size="lg"
+              onPhotoChange={setPhotoURL}
+            />
           </div>
           <div>
             <p className="text-xl font-black" style={{ fontFamily: "var(--font-headline)" }}>{user.displayName}</p>
             <p className="text-white/70 text-sm font-medium">{ROLE_LABELS[user.role] ?? user.role}</p>
             {user.groupName && <p className="text-white/60 text-xs font-medium mt-0.5">📚 {user.groupName}</p>}
+            <p className="text-white/50 text-[10px] mt-1">انقر على الصورة لتغييرها</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3 mt-4 text-center">
@@ -272,6 +281,12 @@ export default function ProfilePage() {
             </p>
           </div>
         )}
+      </div>
+
+      {/* إعدادات الإشعارات */}
+      <div className="space-y-2">
+        <p className="text-xs font-black text-gray-400 uppercase tracking-wider px-1">إشعارات الجهاز</p>
+        <PushNotificationManager />
       </div>
 
       {/* معلومات الحساب */}

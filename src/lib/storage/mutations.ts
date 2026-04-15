@@ -20,7 +20,37 @@ import type {
   Payment,
   PreRegistration,
   DailyReport,
+  ActivityLog,
+  LogAction,
+  LogEntityType,
+  UserRole,
+  CampItem,
+  IssuedDocument,
 } from '../types';
+
+// ─── سجل النشاطات ────────────────────────────────────────
+
+export async function logActivity(params: {
+  schoolId: string;
+  userId: string;
+  userName: string;
+  userRole: UserRole;
+  action: LogAction;
+  entityType: LogEntityType;
+  entityId?: string;
+  entityName?: string;
+  description: string;
+  metadata?: Record<string, any>;
+}): Promise<void> {
+  const log: ActivityLog = {
+    id: uuid(),
+    ...params,
+    createdAt: new Date().toISOString(),
+  };
+  await getDB().activityLogs.add(log);
+}
+
+
 
 // ─── مساعد: حفظ + إضافة للمزامنة ────────────────────────
 
@@ -166,4 +196,45 @@ export async function createReport(
     updatedAt: '',
   };
   return saveAndQueue('reports', 'create', report, saveReport);
+}
+
+// ─── مستلزمات المخيم ─────────────────────────────────
+
+export async function createCampItem(
+  data: Omit<CampItem, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<CampItem> {
+  const now = new Date().toISOString();
+  const item: CampItem = {
+    ...data,
+    id: uuid(),
+    createdAt: now,
+    updatedAt: now,
+  };
+  await getDB().campItems.add(item);
+  return item;
+}
+
+export async function updateCampItem(
+  id: string,
+  patches: Partial<CampItem>
+): Promise<void> {
+  await getDB().campItems.update(id, { ...patches, updatedAt: new Date().toISOString() });
+}
+
+export async function deleteCampItem(id: string): Promise<void> {
+  await getDB().campItems.delete(id);
+}
+
+// ─── الوثائق الصادرة ──────────────────────────────────
+
+export async function createIssuedDocument(
+  data: Omit<IssuedDocument, 'id' | 'issuedAt'>
+): Promise<IssuedDocument> {
+  const doc: IssuedDocument = {
+    ...data,
+    id: uuid(),
+    issuedAt: new Date().toISOString(),
+  };
+  await getDB().issuedDocuments.add(doc);
+  return doc;
 }

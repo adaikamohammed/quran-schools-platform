@@ -53,6 +53,23 @@ export interface SchoolSettings {
   points: PointsConfig;
   rewards: Reward[];
   badges: BadgeConfig[];
+  // نظام الواجهة
+  platformMode?: 'simple' | 'full'; // بسيط أو كامل (افتراضي: full)
+  hiddenFeatures?: string[];         // قائمة featureKeys المخفية
+  enableTajweedTracking?: boolean;   // تتبع التجويد
+}
+
+export type TajweedRule = 
+  | 'أحكام النون الساكنة والتنوين'
+  | 'أحكام الميم الساكنة'
+  | 'المدود'
+  | 'مخارج الحروف'
+  | 'القلقلة'
+  | 'التفخيم والترقيق';
+
+export interface TajweedMastery {
+  overallLevel?: PerformanceLevel | null;
+  rules: Partial<Record<TajweedRule, 'متقن' | 'قيد التعلم' | 'غير مبدوء' | ''>>;
 }
 
 // ─── الطلاب ─────────────────────────────────────────────────
@@ -87,6 +104,7 @@ export interface Student {
   transferHistory?: TransferRecord[];
   createdAt: string;
   updatedAt: string;
+  tajweed?: TajweedMastery;
 }
 
 // ─── العهود والعقوبات ────────────────────────────────────────
@@ -157,6 +175,7 @@ export interface DailyRecord {
   tasmieSurahId?: number;
   tasmieFromVerse?: number;
   tasmieToVerse?: number;
+  tajweedEvaluation?: PerformanceLevel | null;
 }
 
 export interface DailySession {
@@ -333,17 +352,28 @@ export interface MeetingTopic {
 export interface Meeting {
   id: string;
   schoolId: string;
+  type?: 'meeting' | 'event'; // اجتماع (افتراضي) أم مناسبة
   title: string;
   date: string;
   timestamp: string;
-  attendance: Record<string, { name: string; status: 'present' | 'absent' | 'excused' }>;
-  foodProvided: boolean;
-  foodDetails?: string;
-  topics: MeetingTopic[];
+  
+  // خصائص مشتركة
   status: 'upcoming' | 'completed';
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+
+  // خصائص الاجتماعات
+  attendance?: Record<string, { name: string; status: 'present' | 'absent' | 'excused' }>;
+  foodProvided?: boolean;
+  foodDetails?: string;
+  topics?: MeetingTopic[];
+
+  // خصائص المناسبات
+  eventType?: 'دينية' | 'اجتماعية' | 'مسابقة' | 'أخرى';
+  location?: string;
+  targetAudience?: string; // الفئة المستهدفة
+  budget?: number; // الميزانية
 }
 
 // ─── طابور المزامنة ──────────────────────────────────────────
@@ -380,4 +410,135 @@ export interface Surah {
   id: number;
   name: string;
   verses: number;
+}
+
+// ─── سجل النشاطات (Audit Log) ───────────────────────────
+
+export type LogAction =
+  | 'login'
+  | 'logout'
+  | 'create_student'
+  | 'update_student'
+  | 'delete_student'
+  | 'create_session'
+  | 'update_session'
+  | 'create_payment'
+  | 'update_payment'
+  | 'create_covenant'
+  | 'create_meeting'
+  | 'create_registration'
+  | 'update_registration'
+  | 'create_report'
+  | 'update_school_settings'
+  | 'export_document'
+  | 'other';
+
+export type LogEntityType =
+  | 'student'
+  | 'session'
+  | 'payment'
+  | 'covenant'
+  | 'meeting'
+  | 'registration'
+  | 'report'
+  | 'school'
+  | 'system';
+
+export interface ActivityLog {
+  id: string;
+  schoolId: string;
+  userId: string;      // من قام بالفعل
+  userName: string;    // اسمه للعرض
+  userRole: UserRole;
+  action: LogAction;
+  entityType: LogEntityType;
+  entityId?: string;   // معرف العنصر المتأثر
+  entityName?: string; // اسمه للعرض
+  description: string; // نص الوصف بالعربية
+  metadata?: Record<string, any>; // بيانات إضافية
+  createdAt: string;
+}
+
+// ─── مستلزمات المخيم الصيفي ─────────────────────────────
+
+export type CampItemCategory =
+  | 'مواد_غذائية'
+  | 'معدات_رياضية'
+  | 'أدوات_تعليمية'
+  | 'مستلزمات_صحية'
+  | 'مستلزمات_سكن'
+  | 'طباعة_ووثائق'
+  | 'أخرى';
+
+export type CampItemStatus = 'pending' | 'partial' | 'complete' | 'returned';
+
+export interface CampItem {
+  id: string;
+  schoolId: string;
+  campYear: string;       // مثال: "2025"
+  name: string;
+  category: CampItemCategory;
+  quantity: number;       // الكمية المطلوبة
+  quantityBrought: number; // الكمية التي أُحضرت
+  quantityReturned: number; // الكمية التي رُدّت
+  isConsumable: boolean;  // قابل للاستهلاك (لا يُرجع)
+  provider?: string;      // من يتولى التوفير
+  estimatedCost?: number;
+  actualCost?: number;
+  notes?: string;
+  status: CampItemStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── الوثائق والشهادات ───────────────────────────────────
+
+export type DocumentType =
+  | 'شهادة_تقدير'
+  | 'شهادة_حضور'
+  | 'شهادة_إتمام_سورة'
+  | 'شهادة_تميز_شهري'
+  | 'وصل_دفع'
+  | 'كشف_حضور'
+  | 'تقرير_طالب'
+  | 'قائمة_طلاب'
+  | 'نموذج_تسجيل';
+
+export interface IssuedDocument {
+  id: string;
+  schoolId: string;
+  issuedBy: string;     // userId
+  issuedByName: string;
+  documentType: DocumentType;
+  recipientId?: string; // studentId أو teacherId
+  recipientName?: string;
+  title: string;
+  notes?: string;
+  issuedAt: string;
+}
+
+// ─── جدول الحصص الأسبوعي ────────────────────────────────
+
+export type DayOfWeek =
+  | 'الأحد'
+  | 'الإثنين'
+  | 'الثلاثاء'
+  | 'الأربعاء'
+  | 'الخميس'
+  | 'الجمعة'
+  | 'السبت';
+
+export interface TimetableEntry {
+  id: string;
+  schoolId: string;
+  teacherId: string;
+  teacherName?: string;
+  groupName: string;   // الفوج المستهدف
+  dayOfWeek: DayOfWeek;
+  startTime: string;   // مثال "14:00"
+  endTime: string;     // مثال "16:30"
+  subject?: string;    // اختياري: تلقين / مراجعة / إتقان
+  color?: string;      // للتمييز البصري (hex أو tailwind name)
+  createdAt: string;
+  updatedAt: string;
 }

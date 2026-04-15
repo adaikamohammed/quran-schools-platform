@@ -1,4 +1,5 @@
 "use client";
+import SchoolGuard from "@/components/layout/SchoolGuard";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -10,10 +11,11 @@ import {
   Users, Plus, Search, Filter, X, ChevronDown,
   Phone, BookOpen, Calendar, UserCheck, UserX,
   MoreVertical, Edit, Trash2, Eye, Check,
-  ArrowUpDown, Download, Share2,
+  ArrowUpDown, Download, Share2, MessageCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { getDialCode } from "@/lib/countries";
+import { PhotoPicker } from "@/components/ui/PhotoPicker";
 
 // ─── نموذج إضافة طالب ────────────────────────────────────
 
@@ -40,6 +42,7 @@ interface StudentFormData {
   dailyMemorizationAmount: MemorizationAmount;
   memorizedSurahsCount: number;
   notes: string;
+  photoURL?: string;
 }
 
 const EMPTY_FORM: StudentFormData = {
@@ -167,11 +170,19 @@ function StudentModal({
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-gray-100 sticky top-0 bg-white rounded-t-3xl z-10">
-                <div>
-                  <h2 className="text-xl font-black text-gray-900" style={{ fontFamily: "var(--font-headline)" }}>
-                    {initial ? "تعديل بيانات الطالب" : "إضافة طالب جديد"}
-                  </h2>
-                  <p className="text-sm text-gray-400 mt-0.5">أدخل بيانات الطالب بالكامل</p>
+                <div className="flex items-center gap-4">
+                  <PhotoPicker
+                    currentPhoto={form.photoURL}
+                    displayName={form.fullName || "ط"}
+                    size="md"
+                    onPhotoChange={(url) => set("photoURL", url ?? "")}
+                  />
+                  <div>
+                    <h2 className="text-xl font-black text-gray-900" style={{ fontFamily: "var(--font-headline)" }}>
+                      {initial ? "تعديل بيانات الطالب" : "إضافة طالب جديد"}
+                    </h2>
+                    <p className="text-sm text-gray-400 mt-0.5">{initial ? "انقر الصورة لتغييرها" : "أدخل بيانات الطالب بالكامل"}</p>
+                  </div>
                 </div>
                 <button onClick={onClose} className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
                   <X className="w-4 h-4 text-gray-600" />
@@ -492,20 +503,31 @@ function StudentCard({
           <Phone className="w-3 h-3" />
           <span dir="ltr" className="font-mono truncate max-w-[90px]">{student.phone1}</span>
         </div>
-        <div className="flex items-center gap-2">
-          {/*
-            زر نسخ رابط ولي الأمر — أرسله عبر واتساب للولي
-            الرابط: /student/[id] — لا يحتاج حساباً، التحقق برقم الهاتف
-          */}
+        <div className="flex items-center gap-1.5">
+          {/* واتسآب مباشر */}
+          {student.phone1 && (
+            <button
+              onClick={() => {
+                const phone = student.phone1.replace(/\D/g, "");
+                const normalized = phone.startsWith("0") ? "213" + phone.slice(1) : phone;
+                window.open(`https://wa.me/${normalized}`, "_blank");
+              }}
+              title="فتح واتسآب لولي الأمر"
+              className="w-7 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center text-emerald-600 transition-colors"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {/* نسخ رابط متابعة الطالب */}
           <button
             onClick={() => {
               const url = `${window.location.origin}/student/${student.id}`;
               navigator.clipboard.writeText(url)
-                .then(() => alert(`✅ تم نسخ رابط المتابعة!\n\nأرسله للولي عبر واتساب:\n${url}`))
+                .then(() => alert(`✅ تم نسخ رابط المتابعة!\n\nأرسله للولي عبر واتسآب:\n${url}`))
                 .catch(() => alert(`رابط الولي:\n${window.location.origin}/student/${student.id}`));
             }}
             title="نسخ رابط متابعة الطالب لولي الأمر"
-            className="w-7 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center text-emerald-600 transition-colors"
+            className="w-7 h-7 rounded-lg bg-blue-50 hover:bg-blue-100 flex items-center justify-center text-blue-600 transition-colors"
           >
             <Share2 className="w-3.5 h-3.5" />
           </button>
@@ -523,7 +545,7 @@ function StudentCard({
 
 // ─── الصفحة الرئيسية ──────────────────────────────────────
 
-export default function StudentsPage() {
+function StudentsPage() {
   const { user, school, isPrincipal } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
@@ -535,6 +557,8 @@ export default function StudentsPage() {
   const [filterGroup, setFilterGroup] = useState("الكل");
   const [filterGender, setFilterGender] = useState<"الكل" | "ذكر" | "أنثى">("الكل");
   const [sortBy, setSortBy] = useState<"name" | "surahs" | "date">("name");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 24;
 
   const [teachers, setTeachers] = useState<AppUser[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>("all");
@@ -591,6 +615,13 @@ export default function StudentsPage() {
 
     return result;
   }, [students, search, filterStatus, filterGroup, filterGender, sortBy]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => { setCurrentPage(1); }, [search, filterStatus, filterGroup, filterGender, sortBy]);
+
+  // Paginated slice
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paginatedStudents = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   // حفظ طالب جديد أو تعديل
   const handleSave = async (form: StudentFormData) => {
@@ -791,36 +822,85 @@ export default function StudentsPage() {
       {loading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-[var(--color-border)] p-5 animate-pulse">
+            <div key={i} className="bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] p-5 overflow-hidden relative">
+              <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/60 dark:via-white/5 to-transparent" />
               <div className="flex gap-3 mb-4">
-                <div className="w-12 h-12 bg-gray-100 rounded-2xl" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-100 rounded-lg w-3/4" />
-                  <div className="h-3 bg-gray-100 rounded-lg w-1/2" />
+                <div className="w-12 h-12 bg-gray-100 dark:bg-white/8 rounded-2xl" />
+                <div className="flex-1 space-y-2 pt-1">
+                  <div className="h-4 bg-gray-100 dark:bg-white/8 rounded-lg w-3/4" />
+                  <div className="h-3 bg-gray-100 dark:bg-white/8 rounded-lg w-1/2" />
                 </div>
               </div>
-              <div className="h-px bg-gray-100 mb-4" />
+              <div className="h-px bg-gray-100 dark:bg-white/5 mb-4" />
               <div className="grid grid-cols-3 gap-2">
                 {[...Array(3)].map((_, j) => (
-                  <div key={j} className="h-12 bg-gray-100 rounded-xl" />
+                  <div key={j} className="h-12 bg-gray-100 dark:bg-white/8 rounded-xl" />
                 ))}
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <motion.div layout className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <AnimatePresence mode="popLayout">
-            {filtered.map((student) => (
-              <StudentCard
-                key={student.id}
-                student={student}
-                onEdit={handleEdit}
-                onDelete={setDeleteTarget}
-              />
-            ))}
-          </AnimatePresence>
-        </motion.div>
+        <>
+          <motion.div layout className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <AnimatePresence mode="popLayout">
+              {paginatedStudents.map((student) => (
+                <StudentCard
+                  key={student.id}
+                  student={student}
+                  onEdit={handleEdit}
+                  onDelete={setDeleteTarget}
+                />
+              ))}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-3 py-2">
+              <p className="text-xs font-bold text-gray-500 dark:text-gray-400">
+                عرض {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} من {filtered.length} طالب
+              </p>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="w-9 h-9 rounded-xl border border-[var(--color-border)] bg-white dark:bg-[var(--color-card)] flex items-center justify-center text-gray-500 hover:bg-gray-50 dark:hover:bg-white/8 disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-bold text-sm"
+                >
+                  ›
+                </button>
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  let page = i + 1;
+                  if (totalPages > 5) {
+                    if (currentPage <= 3) page = i + 1;
+                    else if (currentPage >= totalPages - 2) page = totalPages - 4 + i;
+                    else page = currentPage - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-9 h-9 rounded-xl text-sm font-bold transition-colors ${
+                        currentPage === page
+                          ? "bg-[var(--color-primary)] text-white shadow-sm"
+                          : "bg-white dark:bg-[var(--color-card)] border border-[var(--color-border)] text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/8"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="w-9 h-9 rounded-xl border border-[var(--color-border)] bg-white dark:bg-[var(--color-card)] flex items-center justify-center text-gray-500 hover:bg-gray-50 dark:hover:bg-white/8 disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-bold text-sm"
+                >
+                  ‹
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Modal إضافة/تعديل */}
@@ -877,5 +957,14 @@ export default function StudentsPage() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+// ── Guard wrapper (auto-generated) ──
+export default function StudentsPagePage() {
+  return (
+    <SchoolGuard>
+      <StudentsPage />
+    </SchoolGuard>
   );
 }

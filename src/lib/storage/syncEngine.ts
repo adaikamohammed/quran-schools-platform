@@ -74,6 +74,7 @@ async function performSync(): Promise<void> {
     const res = await fetch('/api/sync/push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ operations: pendingItems }),
     });
 
@@ -130,6 +131,7 @@ export async function pullSync(): Promise<void> {
   try {
     const res = await fetch(`/api/sync/pull?lastSyncAt=${encodeURIComponent(lastSyncAt)}`, {
       method: "GET",
+      credentials: "include",
     });
 
     if (!res.ok) {

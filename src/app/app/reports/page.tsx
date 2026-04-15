@@ -1,4 +1,5 @@
-"use client";
+﻿"use client";
+import SchoolGuard from "@/components/layout/SchoolGuard";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -348,7 +349,7 @@ function NewReportModal({
 
 // ─── الصفحة الرئيسية ──────────────────────────────────────
 
-export default function ReportsPage() {
+function ReportsPage() {
   const { user, school, isPrincipal } = useAuth();
   const [teachers, setTeachers] = useState<AppUser[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>("all");
@@ -647,5 +648,14 @@ export default function ReportsPage() {
         />
       )}
     </div>
+  );
+}
+
+// ── Guard wrapper (auto-generated) ──
+export default function ReportsPagePage() {
+  return (
+    <SchoolGuard>
+      <ReportsPage />
+    </SchoolGuard>
   );
 }
