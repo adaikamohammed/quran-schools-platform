@@ -1,9 +1,8 @@
 /// <reference lib="webworker" />
-import type { PushEvent, NotificationEvent } from "@serwist/sw";
 import { defaultCache } from "@serwist/next/worker";
 import { Serwist } from "serwist";
 
-declare const self: ServiceWorkerGlobalScope;
+declare const self: ServiceWorkerGlobalScope & { __SW_MANIFEST: any[] };
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
@@ -19,17 +18,17 @@ serwist.addEventListeners();
 self.addEventListener("push", (event: PushEvent) => {
   const data = event.data?.json() ?? {};
   const title: string = data.title ?? "منصة المدارس القرآنية";
-  const options: NotificationOptions = {
+  const options = {
     body: data.body ?? "لديك إشعار جديد",
     icon: "/icons/icon-192x192.png",
     badge: "/icons/badge-72x72.png",
-    dir: "rtl",
+    dir: "rtl" as const,
     lang: "ar",
     tag: data.tag ?? "default",
     data: data.url ? { url: data.url } : undefined,
     vibrate: [200, 100, 200],
     requireInteraction: data.urgent ?? false,
-  };
+  } as NotificationOptions;
   event.waitUntil(self.registration.showNotification(title, options));
 });
 

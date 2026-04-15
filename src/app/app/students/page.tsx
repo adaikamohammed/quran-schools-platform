@@ -503,7 +503,7 @@ function TransferModal({
           <select value={newTeacherId} onChange={e => setNewTeacherId(e.target.value)}
             className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:border-[var(--color-primary)]/60">
             <option value="">اختر المعلم الجديد...</option>
-            {teachers.map(t => <option key={t.id} value={t.id}>{t.fullName}</option>)}
+            {teachers.map(t => <option key={t.id} value={t.id}>{t.displayName}</option>)}
           </select>
         </div>
 
@@ -885,10 +885,10 @@ function StudentsPage() {
     const transferRecord = {
       date: new Date().toISOString().split("T")[0],
       fromTeacherId: student.teacherId,
-      fromTeacherName: teachers.find(t => t.id === student.teacherId)?.fullName ?? "",
+      fromTeacherName: teachers.find(t => t.id === student.teacherId)?.displayName ?? "",
       fromGroupName: student.groupName,
       toTeacherId: newTeacherId,
-      toTeacherName: newTeacher?.fullName ?? "",
+      toTeacherName: newTeacher?.displayName ?? "",
       toGroupName: newGroupName,
       reason,
     };

@@ -75,7 +75,8 @@ export default function MemorizationChart({ studentId, sessions }: Props) {
             <YAxis tick={{fontSize: 10, fill: '#9CA3AF', fontFamily: 'var(--font-cairo)'}} axisLine={false} tickLine={false} dx={-10} />
             <Tooltip 
               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px', direction: 'rtl', fontFamily: 'var(--font-cairo)' }}
-              formatter={(value: any, name: string, props: any) => [`${value} آية (${props.payload.performance})`, 'مقدار التسميع']}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              formatter={(value: any, _name: any, props: any) => [`${value} آية (${props.payload.performance})`, 'مقدار التسميع'] as any}
               labelFormatter={(label) => 'التاريخ: ' + label}
             />
             <Line 
