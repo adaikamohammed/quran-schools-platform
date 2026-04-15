@@ -1,12 +1,13 @@
-﻿"use client";
+"use client";
 import SchoolGuard from "@/components/layout/SchoolGuard";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getDB, saveRegistration, queueForSync } from "@/lib/storage/db";
-import { createRegistration, updateRegistrationStatus } from "@/lib/storage/mutations";
-import type { PreRegistration, PreRegistrationStatus } from "@/lib/types";
+import { createRegistration, updateRegistrationStatus, createStudent, updateStudent } from "@/lib/storage/mutations";
+import type { PreRegistration, PreRegistrationStatus, AppUser, SubscriptionTier, MemorizationAmount, Student, TransferRecord } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
+import Modal, { ModalSection } from "@/components/ui/Modal";
 import {
   UserPlus, Search, Plus, X, Loader2, Send,
   ChevronRight, ChevronLeft, Edit3, LayoutGrid, Table2,
@@ -316,39 +317,37 @@ function NewRegModal({ schoolId, onSave, onClose }: {
     onSave(reg); setSaving(false); onClose();
   };
 
+  const iconEl = (
+    <div className="relative">
+      <PhotoPicker currentPhoto={form.photoURL} displayName={form.fullName || "ط"} size="md"
+        onPhotoChange={(url) => setForm({ ...form, photoURL: url ?? "" })} />
+    </div>
+  );
+
+  const footer = (
+    <div className="flex gap-3 w-full">
+      <button onClick={onClose} className="btn-secondary flex-1 py-3 justify-center text-sm">إلغاء</button>
+      <button onClick={handleSave} disabled={!form.fullName.trim() || !form.phone1.trim() || saving}
+        className="btn-primary flex-1 py-3 justify-center text-sm disabled:opacity-40">
+        {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> حفظ...</> : <><Send className="w-4 h-4" /> تسجيل المرشح</>}
+      </button>
+    </div>
+  );
+
   return (
-    <AnimatePresence>
-      <motion.div key="nb" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <motion.div key="nm" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-7 py-5 bg-gradient-to-l from-[var(--color-primary)] to-[var(--color-primary-dark)] text-white shrink-0">
-            <div className="flex items-center gap-4">
-              <PhotoPicker currentPhoto={form.photoURL} displayName={form.fullName || "ط"} size="md"
-                onPhotoChange={(url) => setForm({ ...form, photoURL: url ?? "" })} />
-              <div>
-                <h3 className="font-black text-base">تسجيل مرشح جديد</h3>
-                <p className="text-white/70 text-xs mt-0.5">انقر الصورة لإضافتها</p>
-              </div>
-            </div>
-            <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
-              <X className="w-5 h-5" /></button>
-          </div>
-          <div className="flex-1 overflow-y-auto px-7 py-6">
-            <RegFormFields form={form} onChange={up} />
-          </div>
-          <div className="flex gap-3 px-7 py-5 border-t border-gray-100 bg-gray-50/50 shrink-0">
-            <button onClick={onClose} className="btn-secondary flex-1 py-3 justify-center text-sm">إلغاء</button>
-            <button onClick={handleSave} disabled={!form.fullName.trim() || !form.phone1.trim() || saving}
-              className="btn-primary flex-1 py-3 justify-center text-sm disabled:opacity-40">
-              {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> حفظ...</> : <><Send className="w-4 h-4" /> تسجيل المرشح</>}
-            </button>
-          </div>
-        </div>
-      </motion.div>
-    </AnimatePresence>
+    <Modal
+      open={true}
+      onClose={onClose}
+      size="lg"
+      title="تسجيل مرشح جديد"
+      description="انقر الصورة لإضافتها"
+      icon={iconEl}
+      footer={footer}
+    >
+      <div className="py-2">
+        <RegFormFields form={form} onChange={up} />
+      </div>
+    </Modal>
   );
 }
 
@@ -386,92 +385,197 @@ function EditRegModal({ reg, onSave, onClose }: {
     }
   };
 
+  const iconEl = (
+    <div className="relative">
+      <PhotoPicker currentPhoto={form.photoURL} displayName={form.fullName || "ط"} size="md"
+        onPhotoChange={(url) => setForm({ ...form, photoURL: url ?? "" })} />
+    </div>
+  );
+
+  const footer = (
+    <div className="flex gap-3 w-full">
+      <button onClick={onClose} className="btn-secondary flex-1 py-3 justify-center text-sm">إلغاء</button>
+      <button onClick={handleSave} disabled={!form.fullName.trim() || !form.phone1.trim() || saving}
+        className="flex-1 py-3 justify-center text-sm font-black rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] text-white flex items-center gap-2 transition-colors disabled:opacity-40">
+        {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> حفظ...</> : <><Save className="w-4 h-4" /> حفظ التعديلات</>}
+      </button>
+    </div>
+  );
+
   return (
-    <AnimatePresence>
-      <motion.div key="eb" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <motion.div key="em" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between px-7 py-5 bg-gradient-to-l from-indigo-600 to-indigo-800 text-white shrink-0">
-            <div className="flex items-center gap-4">
-              <PhotoPicker currentPhoto={form.photoURL} displayName={form.fullName || "ط"} size="md"
-                onPhotoChange={(url) => setForm({ ...form, photoURL: url ?? "" })} />
-              <div>
-                <h3 className="font-black text-base">تعديل بيانات المرشح</h3>
-                <p className="text-white/70 text-sm mt-0.5">{reg.fullName}</p>
-              </div>
-            </div>
-            <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
-              <X className="w-5 h-5" /></button>
-          </div>
-          {/* Body */}
-          <div className="flex-1 overflow-y-auto px-7 py-6">
-            <RegFormFields form={form} onChange={up} isEdit />
-          </div>
-          {/* Footer */}
-          <div className="flex gap-3 px-7 py-5 border-t border-gray-100 bg-gray-50/50 shrink-0">
-            <button onClick={onClose} className="btn-secondary flex-1 py-3 justify-center text-sm">إلغاء</button>
-            <button onClick={handleSave} disabled={!form.fullName.trim() || !form.phone1.trim() || saving}
-              className="flex-1 py-3 justify-center text-sm font-black rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2 transition-colors disabled:opacity-40">
-              {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> حفظ...</> : <><Save className="w-4 h-4" /> حفظ التعديلات</>}
-            </button>
-          </div>
-        </div>
-      </motion.div>
-    </AnimatePresence>
+    <Modal
+      open={true}
+      onClose={onClose}
+      size="lg"
+      title="تعديل بيانات المرشح"
+      description={reg.fullName}
+      icon={iconEl}
+      footer={footer}
+    >
+      <div className="py-2">
+        <RegFormFields form={form} onChange={up} isEdit />
+      </div>
+    </Modal>
   );
 }
 
 // ──────────────────────────────────────────────────────────
-// Modal تغيير الحالة فقط
+// Modal تغيير الحالة (مع نموذج الإلحاق عند الانضمام)
 // ──────────────────────────────────────────────────────────
-function StatusModal({ reg, onSave, onClose }: {
-  reg: PreRegistration; onSave: (id: string, status: PreRegistrationStatus) => void; onClose: () => void;
+const MEMORIZATION_AMOUNTS: MemorizationAmount[] = ["ثمن", "ربع", "نصف", "صفحة", "أكثر"];
+const SUBSCRIPTION_TIERS: SubscriptionTier[] = ["فئة الأصاغر", "فئة الأكابر"];
+
+function StatusModal({ reg, schoolId, onSave, onClose }: {
+  reg: PreRegistration;
+  schoolId: string;
+  onSave: (id: string, status: PreRegistrationStatus, enrollData?: EnrollData) => void;
+  onClose: () => void;
 }) {
   const [selected, setSelected] = useState<PreRegistrationStatus>(reg.status);
+  const [teachers, setTeachers] = useState<AppUser[]>([]);
+  const [enroll, setEnroll] = useState({
+    teacherId: "",
+    groupName: "",
+    subscriptionTier: "فئة الأصاغر" as SubscriptionTier,
+    dailyMemorizationAmount: "ربع" as MemorizationAmount,
+  });
+  const [saving, setSaving] = useState(false);
+  const [existingGroups, setExistingGroups] = useState<string[]>([]);
+
+  useEffect(() => {
+    const db = getDB();
+    db.users.where("schoolId").equals(schoolId).and(u => u.role === "teacher").toArray().then(setTeachers);
+    db.students.where("schoolId").equals(schoolId).toArray().then(studs => {
+      const groups = [...new Set(studs.map(s => s.groupName))].filter(Boolean);
+      setExistingGroups(groups);
+    });
+  }, [schoolId]);
+
+  const isJoining = selected === "تم الإنضمام";
+  const enrollValid = !isJoining || (enroll.teacherId.trim() && enroll.groupName.trim());
+
+  const handleSave = async () => {
+    if (!enrollValid) return;
+    setSaving(true);
+    if (isJoining) {
+      onSave(reg.id, selected, enroll);
+    } else {
+      onSave(reg.id, selected);
+    }
+    setSaving(false);
+    onClose();
+  };
+
+  const footer = (
+    <div className="flex gap-3 w-full">
+      <button onClick={onClose} className="btn-secondary flex-1 py-2.5 justify-center text-sm">إلغاء</button>
+      <button onClick={handleSave} disabled={!enrollValid || saving}
+        className="btn-primary flex-1 py-2.5 justify-center text-sm disabled:opacity-40">
+        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+        {isJoining ? "إلحاق الطالب بالفوج" : "حفظ الحالة"}
+      </button>
+    </div>
+  );
+
   return (
-    <AnimatePresence>
-      <motion.div key="sb" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <motion.div key="sm" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <div><h3 className="font-black text-gray-900">تغيير الحالة</h3>
-              <p className="text-xs text-gray-400 mt-0.5">{reg.fullName}</p></div>
-            <button onClick={onClose} className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
-              <X className="w-4 h-4 text-gray-500" /></button>
-          </div>
-          <div className="p-6 grid grid-cols-2 gap-3">
-            {ALL_STATUSES.map((s) => {
-              const cfg = STATUS_CFG[s]; const active = selected === s;
-              return (
-                <button key={s} onClick={() => setSelected(s)}
-                  className={`flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-right ${
-                    active ? `${cfg.bg} ${cfg.border} ${cfg.color} shadow-sm` : "bg-gray-50 border-gray-100 text-gray-600 hover:border-gray-200"
-                  }`}>
-                  <span className="text-xl">{cfg.emoji}</span>
-                  <p className="text-sm font-black">{cfg.label}</p>
-                  {active && <div className="mr-auto w-3 h-3 rounded-full bg-current opacity-60 shrink-0" />}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex gap-3 px-6 pb-6">
-            <button onClick={onClose} className="btn-secondary flex-1 py-2.5 justify-center text-sm">إلغاء</button>
-            <button onClick={() => { onSave(reg.id, selected); onClose(); }}
-              className="btn-primary flex-1 py-2.5 justify-center text-sm">
-              <CheckCircle2 className="w-4 h-4" /> حفظ الحالة
+    <Modal open={true} onClose={onClose} size={isJoining ? "md" : "sm"}
+      title="تغيير الحالة" description={reg.fullName} footer={footer}>
+      <div className="grid grid-cols-2 gap-3 py-2">
+        {ALL_STATUSES.map((s) => {
+          const cfg = STATUS_CFG[s]; const active = selected === s;
+          return (
+            <button key={s} onClick={() => setSelected(s)}
+              className={`flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-right ${
+                active ? `${cfg.bg} ${cfg.border} ${cfg.color} shadow-sm` : "bg-gray-50 border-gray-100 text-gray-600 hover:border-gray-200"
+              }`}>
+              <span className="text-xl">{cfg.emoji}</span>
+              <p className="text-sm font-black">{cfg.label}</p>
+              {active && <div className="mr-auto w-3 h-3 rounded-full bg-current opacity-60 shrink-0" />}
             </button>
+          );
+        })}
+      </div>
+
+      {/* نموذج الإلحاق الإجباري عند الانضمام */}
+      {isJoining && (
+        <div className="mt-4 border-t border-gray-100 pt-4 space-y-4">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+            <p className="text-sm font-black text-gray-800">تحديد فوج الطالب <span className="text-red-500">*</span></p>
+          </div>
+
+          {/* الشيخ */}
+          <div className="space-y-1">
+            <label className="text-xs font-black text-gray-500 uppercase tracking-wider">الشيخ / المعلم *</label>
+            <select
+              value={enroll.teacherId}
+              onChange={e => setEnroll(p => ({ ...p, teacherId: e.target.value }))}
+              className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:border-[var(--color-primary)]/60"
+            >
+              <option value="">اختر المعلم...</option>
+              {teachers.map(t => <option key={t.id} value={t.id}>{t.fullName}</option>)}
+            </select>
+            {!enroll.teacherId && <p className="text-[10px] text-red-500 font-bold">الشيخ إجباري لإلحاق الطالب</p>}
+          </div>
+
+          {/* الفوج */}
+          <div className="space-y-1">
+            <label className="text-xs font-black text-gray-500 uppercase tracking-wider">الفوج القرآني *</label>
+            <input
+              value={enroll.groupName}
+              onChange={e => setEnroll(p => ({ ...p, groupName: e.target.value }))}
+              list="enroll-groups-list"
+              placeholder="مثال: فوج النور"
+              className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:border-[var(--color-primary)]/60"
+            />
+            <datalist id="enroll-groups-list">
+              {existingGroups.map(g => <option key={g} value={g} />)}
+            </datalist>
+            {!enroll.groupName && <p className="text-[10px] text-red-500 font-bold">اسم الفوج إجباري</p>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {/* فئة الاشتراك */}
+            <div className="space-y-1">
+              <label className="text-xs font-black text-gray-500">فئة الاشتراك</label>
+              <div className="flex gap-1.5">
+                {SUBSCRIPTION_TIERS.map(t => (
+                  <button key={t} type="button" onClick={() => setEnroll(p => ({ ...p, subscriptionTier: t }))}
+                    className={`flex-1 py-2 rounded-xl text-[11px] font-black border transition-all ${
+                      enroll.subscriptionTier === t ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]" : "bg-white border-gray-200 text-gray-600"
+                    }`}>{t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* المقدار اليومي */}
+            <div className="space-y-1">
+              <label className="text-xs font-black text-gray-500">المقدار اليومي</label>
+              <div className="flex flex-wrap gap-1">
+                {MEMORIZATION_AMOUNTS.map(a => (
+                  <button key={a} type="button" onClick={() => setEnroll(p => ({ ...p, dailyMemorizationAmount: a }))}
+                    className={`px-2.5 py-1.5 rounded-lg text-[11px] font-black border transition-all ${
+                      enroll.dailyMemorizationAmount === a ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]" : "bg-white border-gray-200 text-gray-600"
+                    }`}>{a}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
-      </motion.div>
-    </AnimatePresence>
+      )}
+    </Modal>
   );
+}
+
+export interface EnrollData {
+  teacherId: string;
+  groupName: string;
+  subscriptionTier: SubscriptionTier;
+  dailyMemorizationAmount: MemorizationAmount;
 }
 
 // ──────────────────────────────────────────────────────────
@@ -481,42 +585,40 @@ function BulkStatusModal({ count, onSave, onClose }: {
   count: number; onSave: (s: PreRegistrationStatus) => void; onClose: () => void;
 }) {
   const [selected, setSelected] = useState<PreRegistrationStatus>("مرشح");
+  const footer = (
+    <div className="flex gap-3 w-full">
+      <button onClick={onClose} className="btn-secondary flex-1 py-2.5 justify-center text-sm">إلغاء</button>
+      <button onClick={() => { onSave(selected); onClose(); }} className="btn-primary flex-1 py-2.5 justify-center text-sm">
+        <Settings2 className="w-4 h-4" /> تطبيق
+      </button>
+    </div>
+  );
+
   return (
-    <AnimatePresence>
-      <motion.div key="bb" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <motion.div key="bm" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }} className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <div><h3 className="font-black text-gray-900">تعديل جماعي</h3>
-              <p className="text-xs text-gray-400 mt-0.5">تغيير حالة {count} مرشح</p></div>
-            <button onClick={onClose} className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200"><X className="w-4 h-4 text-gray-500" /></button>
-          </div>
-          <div className="p-5 grid grid-cols-2 gap-2">
-            {ALL_STATUSES.map((s) => {
-              const cfg = STATUS_CFG[s]; const active = selected === s;
-              return (
-                <button key={s} onClick={() => setSelected(s)}
-                  className={`flex items-center gap-2 p-3 rounded-xl border-2 text-right transition-all ${
-                    active ? `${cfg.bg} ${cfg.border} ${cfg.color}` : "bg-gray-50 border-gray-100 text-gray-600 hover:border-gray-200"
-                  }`}>
-                  <span>{cfg.emoji}</span>
-                  <span className="text-xs font-black">{cfg.label}</span>
-                  {active && <div className="mr-auto w-2.5 h-2.5 rounded-full bg-current opacity-60" />}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex gap-3 px-5 pb-5">
-            <button onClick={onClose} className="btn-secondary flex-1 py-2.5 justify-center text-sm">إلغاء</button>
-            <button onClick={() => { onSave(selected); onClose(); }} className="btn-primary flex-1 py-2.5 justify-center text-sm">
-              <Settings2 className="w-4 h-4" /> تطبيق
+    <Modal
+      open={true}
+      onClose={onClose}
+      size="sm"
+      title="تعديل جماعي"
+      description={`تغيير حالة ${count} مرشح`}
+      footer={footer}
+    >
+      <div className="grid grid-cols-2 gap-2 py-2">
+        {ALL_STATUSES.map((s) => {
+          const cfg = STATUS_CFG[s]; const active = selected === s;
+          return (
+            <button key={s} onClick={() => setSelected(s)}
+              className={`flex items-center gap-2 p-3 rounded-xl border-2 text-right transition-all ${
+                active ? `${cfg.bg} ${cfg.border} ${cfg.color}` : "bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700/50 text-gray-600 dark:text-gray-300 hover:border-gray-200 dark:hover:border-gray-600"
+              }`}>
+              <span>{cfg.emoji}</span>
+              <span className="text-xs font-black">{cfg.label}</span>
+              {active && <div className="mr-auto w-2.5 h-2.5 rounded-full bg-current opacity-60" />}
             </button>
-          </div>
-        </div>
-      </motion.div>
-    </AnimatePresence>
+          );
+        })}
+      </div>
+    </Modal>
   );
 }
 
@@ -864,9 +966,42 @@ function RegistrationsPage() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setCurrentPage(1); setSelectedIds([]); }, [filterStatus, filterYear, search]);
 
-  const handleStatusChange = async (id: string, status: PreRegistrationStatus) => {
+  const handleStatusChange = async (id: string, status: PreRegistrationStatus, enrollData?: EnrollData) => {
     setUpdating(id);
+    const reg = registrations.find(r => r.id === id);
     await updateRegistrationStatus(id, status, user?.id);
+
+    // إذا انضم المرشح → أنشئ حساب طالب رسمي
+    if (status === "تم الإنضمام" && enrollData && reg && school?.id) {
+      await createStudent({
+        schoolId: school.id,
+        teacherId: enrollData.teacherId,
+        groupName: enrollData.groupName,
+        fullName: reg.fullName,
+        gender: (reg.gender as "ذكر" | "أنثى") || "ذكر",
+        birthDate: reg.birthDate ?? "",
+        educationalLevel: reg.educationalLevel,
+        guardianName: reg.guardianName ?? "",
+        phone1: reg.phone1,
+        phone2: reg.phone2,
+        photoURL: reg.photoURL,
+        registrationDate: new Date().toISOString().split("T")[0],
+        status: "نشط",
+        subscriptionTier: enrollData.subscriptionTier,
+        memorizedSurahsCount: 0,
+        dailyMemorizationAmount: enrollData.dailyMemorizationAmount,
+        notes: reg.notes,
+        transferHistory: [{
+          date: new Date().toISOString().split("T")[0],
+          fromTeacherId: "",
+          fromGroupName: "تسجيل مبدئي",
+          toTeacherId: enrollData.teacherId,
+          toGroupName: enrollData.groupName,
+          reason: "إلحاق جديد من قائمة التسجيلات",
+        }],
+      });
+    }
+
     setRegistrations((prev) => prev.map((r) => r.id === id ? { ...r, status } : r));
     setUpdating(null);
   };
@@ -1051,8 +1186,8 @@ function RegistrationsPage() {
       {editModal && (
         <EditRegModal reg={editModal} onSave={handleRegistrationUpdate} onClose={() => setEditModal(null)} />
       )}
-      {statusModal && (
-        <StatusModal reg={statusModal} onSave={handleStatusChange} onClose={() => setStatusModal(null)} />
+      {statusModal && school && (
+        <StatusModal reg={statusModal} schoolId={school.id} onSave={handleStatusChange} onClose={() => setStatusModal(null)} />
       )}
       {bulkModal && (
         <BulkStatusModal count={selectedIds.length} onSave={handleBulkStatusChange} onClose={() => setBulkModal(false)} />

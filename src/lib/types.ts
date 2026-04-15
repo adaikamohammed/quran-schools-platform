@@ -105,6 +105,7 @@ export interface Student {
   createdAt: string;
   updatedAt: string;
   tajweed?: TajweedMastery;
+  currentSurahId?: number;
 }
 
 // ─── العهود والعقوبات ────────────────────────────────────────
@@ -167,6 +168,7 @@ export interface DailyRecord {
   review: boolean | null;
   behavior: BehaviorLevel | null;
   notes?: string;
+  absenceReason?: string;
   // تلقين
   talqinSurahId?: number;
   talqinFromVerse?: number;

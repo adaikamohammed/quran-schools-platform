@@ -38,6 +38,7 @@ import {
   ScrollText,
   FolderOpen,
   Bell,
+  Layers,
 } from "lucide-react";
 
 // ─── تعريف التنقل ──────────────────────────────────────────
@@ -71,6 +72,7 @@ const SCHOOL_NAV_GROUPS: NavGroup[] = [
       { href: "/app/sessions",  label: "الحصص اليومية",    icon: ClipboardList,   featureKey: "sessions" },
       { href: "/app/timetable", label: "جدول الحصص",       icon: Calendar,        featureKey: "timetable" },
       { href: "/app/students",  label: "إدارة الطلاب",      icon: Users,           featureKey: "students" },
+      { href: "/app/groups",    label: "إدارة المجموعات",   icon: Layers,          featureKey: "groups" },
       { href: "/app/quran",     label: "متابعة الحفظ",      icon: BookCheck,       featureKey: "quran" },
       { href: "/app/covenants", label: "العهود والعقوبات",  icon: Gavel,           featureKey: "covenants" },
     ],
@@ -482,12 +484,20 @@ export default function AppSidebar({
                 <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
                   {user?.displayName ?? "المستخدم"}
                 </p>
-                <p className="text-xs text-[var(--color-muted-foreground)] font-medium">
-                  {roleLabel(role)}
-                </p>
+                {role === "teacher" && user?.groupName ? (
+                  <p className="text-xs font-bold text-[var(--color-primary)] truncate flex items-center gap-1">
+                    <span>🏷️</span>
+                    {user.groupName}
+                  </p>
+                ) : (
+                  <p className="text-xs text-[var(--color-muted-foreground)] font-medium">
+                    {roleLabel(role)}
+                  </p>
+                )}
               </div>
             </div>
           )}
+
 
           {/* Dark mode toggle */}
           <button

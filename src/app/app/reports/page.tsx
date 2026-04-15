@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import SchoolGuard from "@/components/layout/SchoolGuard";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -15,6 +15,7 @@ import {
   RefreshCw, Archive, Eye, BookOpen, Zap, Users
 } from "lucide-react";
 import { v4 as uuid } from "uuid";
+import LivePresence from "@/components/ui/LivePresence";
 
 // ─── الثوابت ─────────────────────────────────────────────
 
@@ -479,13 +480,16 @@ function ReportsPage() {
             {stats.total} تقرير · {stats.pending} قيد المراجعة
           </p>
         </div>
-        <button
-          onClick={() => setShowNew(true)}
-          className="btn-primary shrink-0 py-2.5 text-sm"
-        >
-          <Plus className="w-4 h-4" />
-          تقرير جديد
-        </button>
+        <div className="flex items-center gap-3">
+          {school && <LivePresence roomId={`reports_${school.id}`} isTyping={showNew} />}
+          <button
+            onClick={() => setShowNew(true)}
+            className="btn-primary shrink-0 py-2.5 text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            تقرير جديد
+          </button>
+        </div>
       </div>
 
       {/* ─── فلتر المعلم (للمدراء فقط) ─── */}

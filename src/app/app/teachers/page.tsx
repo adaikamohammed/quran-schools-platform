@@ -1,10 +1,11 @@
-﻿"use client";
+"use client";
 import SchoolGuard from "@/components/layout/SchoolGuard";
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { createClient } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
+import Modal, { ModalSection } from "@/components/ui/Modal";
 import { 
   Users, Plus, Search, Edit, Trash2, X, AlertTriangle, CheckCircle2,
   Shield, UserCog, BookOpen
@@ -56,101 +57,93 @@ function TeacherModal({
     }
   };
 
+  const iconEl = (
+    <div className="relative">
+      <PhotoPicker
+        currentPhoto={form.photoURL}
+        displayName={form.displayName || "م"}
+        size="md"
+        onPhotoChange={(url) => setForm({ ...form, photoURL: url ?? undefined })}
+      />
+    </div>
+  );
+
+  const footer = (
+    <div className="flex gap-3 w-full">
+      <button onClick={onClose} className="btn-secondary flex-1 py-3 justify-center text-sm">إلغاء</button>
+      <button onClick={handleSave} disabled={saving}
+        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] text-white text-sm font-bold shadow-md transition-colors disabled:opacity-50">
+        {saving ? <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin flex-shrink-0" /> : <CheckCircle2 className="w-5 h-5 flex-shrink-0" />}
+        حفظ البيانات
+      </button>
+    </div>
+  );
+
   return (
-    <AnimatePresence>
-      <motion.div key="teacher-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <motion.div
-        key="teacher-modal"
-        initial={{ opacity: 0, y: 30, scale: 0.96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 30 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      >
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
-          <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-gradient-to-l from-[var(--color-primary)] to-[var(--color-primary-dark)] text-white">
-            <div className="flex items-center gap-4">
-              <PhotoPicker
-                currentPhoto={form.photoURL}
-                displayName={form.displayName || "م"}
-                size="md"
-                onPhotoChange={(url) => setForm({ ...form, photoURL: url })}
-              />
-              <div>
-                <h3 className="font-black text-sm">{teacher ? "تعديل بيانات المعلم" : "إضافة معلم جديد"}</h3>
-                <p className="text-white/70 text-xs mt-0.5">{schoolName}</p>
-              </div>
-            </div>
-            <button onClick={onClose} className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
-              <X className="w-4 h-4" />
-            </button>
+    <Modal
+      open={true}
+      onClose={onClose}
+      size="md"
+      title={teacher ? "تعديل بيانات المعلم" : "إضافة معلم جديد"}
+      description={schoolName}
+      icon={iconEl}
+      footer={footer}
+    >
+      <div className="p-6 space-y-4">
+        {error && (
+          <div className="p-3 bg-red-50 text-red-600 rounded-xl text-xs font-bold border border-red-100 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            {error}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2 sm:col-span-1">
+            <label className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">الاسم الكامل <span className="text-red-500">*</span></label>
+            <input type="text" value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+              placeholder="محمد أمين" className="input-field py-2.5 text-sm w-full" />
+          </div>
+          <div className="col-span-2 sm:col-span-1">
+            <label className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">اسم الفوج / الحلقة</label>
+            <input type="text" value={form.groupName} onChange={(e) => setForm({ ...form, groupName: e.target.value })}
+              placeholder="فوج الإمام مالك" className="input-field py-2.5 text-sm w-full" />
           </div>
 
-          <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
-            {error && (
-              <div className="p-3 bg-red-50 text-red-600 rounded-xl text-xs font-bold border border-red-100 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                {error}
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2 sm:col-span-1">
-                <label className="label-xs">الاسم الكامل <span className="text-red-500">*</span></label>
-                <input type="text" value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-                  placeholder="محمد أمين" className="input-field py-2.5 mt-1.5 text-sm" />
-              </div>
-              <div className="col-span-2 sm:col-span-1">
-                <label className="label-xs">اسم الفوج / الحلقة</label>
-                <input type="text" value={form.groupName} onChange={(e) => setForm({ ...form, groupName: e.target.value })}
-                  placeholder="فوج الإمام مالك" className="input-field py-2.5 mt-1.5 text-sm" />
-              </div>
-
-              <div className="col-span-2">
-                <label className="label-xs">البريد الإلكتروني <span className="text-red-500">*</span></label>
-                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  placeholder="teacher@school.com" className="input-field py-2.5 mt-1.5 text-sm" dir="ltr"
-                  disabled={!!teacher} />
-              </div>
-
-              <div className="col-span-2">
-                <label className="label-xs">كلمة المرور {teacher && "(اتركها فارغة للحفاظ على القديمة)"} {!teacher && <span className="text-red-500">*</span>}</label>
-                <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  placeholder="••••••••" className="input-field py-2.5 mt-1.5 text-sm" dir="ltr" />
-              </div>
-
-              <div className="col-span-2 sm:col-span-1">
-                <label className="label-xs">رقم الهاتف</label>
-                <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  placeholder="0600000000" className="input-field py-2.5 mt-1.5 text-sm text-left" dir="ltr" />
-              </div>
-
-              <div className="col-span-2 sm:col-span-1">
-                <label className="label-xs mb-1.5 block">الجنس</label>
-                <div className="flex gap-2">
-                  {(["ذكر", "أنثى"] as const).map((g) => (
-                    <button key={g} onClick={() => setForm({ ...form, gender: g })}
-                      className={`flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all ${
-                        form.gender === g
-                          ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm"
-                          : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
-                      }`}>{g}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
+          <div className="col-span-2">
+            <label className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">البريد الإلكتروني <span className="text-red-500">*</span></label>
+            <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
+              placeholder="teacher@school.com" className="input-field py-2.5 text-sm w-full" dir="ltr"
+              disabled={!!teacher} />
           </div>
 
-          <div className="flex gap-3 px-5 pb-5 pt-2">
-            <button onClick={onClose} className="btn-secondary flex-1 py-3 justify-center text-sm">إلغاء</button>
-            <button onClick={handleSave} disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] text-white text-sm font-bold shadow-md transition-colors disabled:opacity-50">
-              {saving ? <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <><CheckCircle2 className="w-5 h-5" /> حفظ البيانات</>}
-            </button>
+          <div className="col-span-2">
+            <label className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">كلمة المرور {teacher && "(اتركها فارغة للحفاظ على القديمة)"} {!teacher && <span className="text-red-500">*</span>}</label>
+            <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
+              placeholder="••••••••" className="input-field py-2.5 text-sm w-full" dir="ltr" />
+          </div>
+
+          <div className="col-span-2 sm:col-span-1">
+            <label className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">رقم الهاتف</label>
+            <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              placeholder="0600000000" className="input-field py-2.5 text-sm w-full text-left" dir="ltr" />
+          </div>
+
+          <div className="col-span-2 sm:col-span-1">
+            <label className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">الجنس</label>
+            <div className="flex gap-2">
+              {(["ذكر", "أنثى"] as const).map((g) => (
+                <button key={g} onClick={() => setForm({ ...form, gender: g })}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all ${
+                    form.gender === g
+                      ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm"
+                      : "bg-white dark:bg-[var(--color-card)] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-white/10 hover:border-[var(--color-primary)]/40"
+                  }`}>{g}</button>
+              ))}
+            </div>
           </div>
         </div>
-      </motion.div>
-    </AnimatePresence>
+      </div>
+    </Modal>
   );
 }
 

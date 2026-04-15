@@ -3,9 +3,12 @@ import SchoolGuard from "@/components/layout/SchoolGuard";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { getDB } from "@/lib/storage/db";
+import { getDB, getSessionsByDateRange } from "@/lib/storage/db";
 import { createOrUpdateSession } from "@/lib/storage/mutations";
 import { surahs } from "@/lib/surahs";
+import { SessionCalendar } from "@/components/sessions/SessionCalendar";
+import { WeeklyTable } from "@/components/sessions/WeeklyTable";
+import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, format } from "date-fns";
 import type {
   Student,
   DailySession,
@@ -21,7 +24,7 @@ import {
   ChevronRight, ChevronLeft, Calendar, ClipboardList,
   Save, CheckCircle2, AlertTriangle, Loader2, BookOpen,
   MessageSquare, Plus, RefreshCw, ChevronDown, Users,
-  Clock, X, Info,
+  Clock, X, Info, LayoutGrid, CalendarDays
 } from "lucide-react";
 import { v4 as uuid } from "uuid";
 
@@ -88,9 +91,10 @@ interface StudentRowProps {
   onChange: (patch: Partial<DailyRecord>) => void;
   sessionSurahId?: number;
   enableTajweedTracking?: boolean;
+  sessionNum: 1 | 2;
 }
 
-function StudentRow({ student, record, onChange, sessionSurahId, enableTajweedTracking }: StudentRowProps) {
+function StudentRow({ student, record, onChange, sessionSurahId, enableTajweedTracking, sessionNum }: StudentRowProps) {
   const isAbsent = record.attendance === "غائب";
   const [expanded, setExpanded] = useState(false);
 
@@ -108,10 +112,21 @@ function StudentRow({ student, record, onChange, sessionSurahId, enableTajweedTr
 
         {/* الحضور */}
         <div className="flex gap-1 shrink-0">
-          {ATTENDANCE_OPTIONS.map((opt) => (
+          {ATTENDANCE_OPTIONS.filter(opt => sessionNum !== 1 || opt.value !== "تعويض").map((opt) => (
             <button
               key={opt.value}
-              onClick={() => onChange({ attendance: opt.value })}
+              onClick={() => {
+                let patch: Partial<DailyRecord> = { attendance: opt.value };
+                if (["حاضر", "متأخر", "تعويض"].includes(opt.value)) {
+                  if (!record.memorization) {
+                    patch.memorization = "لم يحفظ";
+                  }
+                } else if (opt.value === "غائب") {
+                  patch.memorization = null;
+                  patch.behavior = null;
+                }
+                onChange(patch);
+              }}
               className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all ${
                 record.attendance === opt.value
                   ? `${opt.color} text-white shadow-sm scale-105`
@@ -335,17 +350,22 @@ interface SessionSetupProps {
   onChangeSurah: (id?: number, from?: number, to?: number) => void;
   teacherAbsenceReason?: string;
   onChangeAbsenceReason: (r: string) => void;
+  sessionNum: 1 | 2;
 }
 
 function SessionSetup({
   sessionType, onChangeType,
   surahId, fromVerse, toVerse, onChangeSurah,
   teacherAbsenceReason, onChangeAbsenceReason,
+  sessionNum,
 }: SessionSetupProps) {
   const selectedSurah = surahs.find((s) => s.id === surahId);
   const isAbsence = sessionType === "غياب المعلم";
   const isHoliday = sessionType === "يوم عطلة";
   const showSurah = ["حصة أساسية", "حصة تعويضية", "حصة إضافية"].includes(sessionType);
+  const availableSessionTypes = sessionNum === 1
+    ? SESSION_TYPES.filter(t => t !== "حصة تعويضية" && t !== "حصة إضافية")
+    : SESSION_TYPES;
 
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-4">
@@ -353,7 +373,7 @@ function SessionSetup({
       <div>
         <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2">نوع الحصة</p>
         <div className="flex flex-wrap gap-1.5">
-          {SESSION_TYPES.map((t) => (
+          {availableSessionTypes.map((t) => (
             <button
               key={t}
               onClick={() => onChangeType(t)}
@@ -441,6 +461,8 @@ function SessionsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"daily" | "weekly" | "monthly">("daily");
+  const [sessionsList, setSessionsList] = useState<DailySession[]>([]);
 
   // إعداد الحصة
   const [sessionType, setSessionType] = useState<SessionType>("حصة أساسية");
@@ -448,6 +470,10 @@ function SessionsPage() {
   const [fromVerse, setFromVerse] = useState<number | undefined>();
   const [toVerse, setToVerse] = useState<number | undefined>();
   const [absenceReason, setAbsenceReason] = useState("");
+
+  const [absencePrompt, setAbsencePrompt] = useState<{ studentId: string; sessionsToUpdate: string[] } | null>(null);
+  const [absenceReasonText, setAbsenceReasonText] = useState("");
+  const absencePresets = ["مرض", "سفر", "ظروف عائلية", "بدون مبرر مقنع"];
 
   // ─── تحميل الطلاب + الحصة عند تغيير التاريخ أو رقم الحصة ───
 
@@ -488,7 +514,26 @@ function SessionsPage() {
       studs.sort((a: Student, b: Student) => a.fullName.localeCompare(b.fullName, "ar"));
       setStudents(studs);
 
-      // البحث عن حصة موجودة
+      // تحميل بيانات التقويم أو الجدول الأسبوعي
+      if (viewMode === "monthly") {
+        const startStr = format(startOfMonth(new Date(selectedDate)), "yyyy-MM-dd");
+        const endStr = format(endOfMonth(new Date(selectedDate)), "yyyy-MM-dd");
+        const list = await getSessionsByDateRange(selectedTeacherId, startStr, endStr);
+        setSessionsList(list);
+        setLoading(false);
+        return;
+      } else if (viewMode === "weekly") {
+        const startStr = format(startOfWeek(new Date(selectedDate), { weekStartsOn: 0 }), "yyyy-MM-dd");
+        const endStr = format(endOfWeek(new Date(selectedDate), { weekStartsOn: 0 }), "yyyy-MM-dd");
+        const list = await getSessionsByDateRange(selectedTeacherId, startStr, endStr);
+        setSessionsList(list);
+        // We still need to continue if weekly view shows daily students
+        // Actually WeeklyTable only needs students which we just set, and sessionsList.
+        setLoading(false);
+        return;
+      }
+
+      // البحث عن حصة موجودة (للوضع اليومي)
       const sessionId = `${selectedTeacherId}-${selectedDate}-${sessionNum}`;
       const existingSession = await db.sessions.get(sessionId);
 
@@ -511,6 +556,7 @@ function SessionsPage() {
             review: null,
             behavior: null,
             notes: "",
+            surahId: s.currentSurahId,
           })
         );
       } else {
@@ -530,6 +576,7 @@ function SessionsPage() {
             review: null,
             behavior: null,
             notes: "",
+            surahId: s.currentSurahId,
           }))
         );
       }
@@ -538,16 +585,81 @@ function SessionsPage() {
     };
 
     load();
-  }, [selectedDate, sessionNum, user?.id, school?.id, selectedTeacherId]);
+  }, [selectedDate, sessionNum, user?.id, school?.id, selectedTeacherId, viewMode]);
+
+  // Handle switching sessionNum back to 1 if we're on a prohibited type
+  useEffect(() => {
+    if (sessionNum === 1 && (sessionType === "حصة تعويضية" || sessionType === "حصة إضافية")) {
+      setSessionType("حصة أساسية");
+    }
+  }, [sessionNum, sessionType]);
 
   // ─── تحديث سجل طالب واحد ─────────────────────────────────
 
   const updateRecord = useCallback((studentId: string, patch: Partial<DailyRecord>) => {
-    setRecords((prev) =>
-      prev.map((r) => r.studentId === studentId ? { ...r, ...patch } : r)
-    );
+    setRecords((prev) => {
+      const old = prev.find((r) => r.studentId === studentId);
+      
+      if (patch.attendance && patch.attendance !== old?.attendance) {
+        if (["حاضر", "متأخر", "تعويض"].includes(patch.attendance) && (!old?.attendance || old?.attendance === "غائب" || old?.attendance === "")) {
+          setTimeout(async () => {
+            const db = getDB();
+            const allSessions = await db.sessions.where("teacherId").equals(selectedTeacherId).toArray();
+            
+            const pastSessions = allSessions.filter(s => {
+              if (s.date < selectedDate) return true;
+              if (s.date === selectedDate && s.sessionNumber < sessionNum) return true;
+              return false;
+            });
+            pastSessions.sort((a,b) => {
+              if (a.date === b.date) return b.sessionNumber - a.sessionNumber;
+              return b.date.localeCompare(a.date);
+            });
+            
+            const sessionsToUpdateIds: string[] = [];
+            for (const s of pastSessions) {
+               if (s.sessionType === "يوم عطلة" || s.sessionType === "غياب المعلم") continue;
+               const rec = s.records.find(r => r.studentId === studentId);
+               if (!rec) continue;
+               if (rec.attendance === "غائب") {
+                 if (!rec.absenceReason) {
+                   sessionsToUpdateIds.push(s.id);
+                 } else {
+                   break;
+                 }
+               } else if (["حاضر", "متأخر", "تعويض"].includes(rec.attendance)) {
+                 break;
+               }
+            }
+            if (sessionsToUpdateIds.length > 0) {
+              setAbsencePrompt({ studentId, sessionsToUpdate: sessionsToUpdateIds });
+            }
+          }, 50);
+        }
+      }
+
+      return prev.map((r) => r.studentId === studentId ? { ...r, ...patch } : r);
+    });
     setSaved(false);
-  }, []);
+  }, [selectedDate, selectedTeacherId, sessionNum]);
+
+  const submitAbsenceReason = async () => {
+    if (!absencePrompt || !absenceReasonText.trim()) return;
+    const db = getDB();
+    const sIds = absencePrompt.sessionsToUpdate;
+    for (const sid of sIds) {
+      const s = await db.sessions.get(sid);
+      if (s) {
+        const rIndex = s.records.findIndex(r => r.studentId === absencePrompt.studentId);
+        if (rIndex !== -1) {
+          s.records[rIndex].absenceReason = absenceReasonText.trim();
+          await db.sessions.put(s);
+        }
+      }
+    }
+    setAbsencePrompt(null);
+    setAbsenceReasonText("");
+  };
 
   // ─── حفظ الحصة ───────────────────────────────────────────
 
@@ -578,6 +690,47 @@ function SessionsPage() {
     const db = getDB();
     const updated = await db.sessions.get(sessionId);
     setSession(updated ?? null);
+  };
+
+  const handleBulkTemporalAttend = async (targetDateStr: string) => {
+    if (!user?.id || !school?.id || !selectedTeacherId) return;
+    setSaving(true);
+    const db = getDB();
+    const sessionId = `${selectedTeacherId}-${targetDateStr}-1`;
+    const existingSession = await db.sessions.get(sessionId);
+
+    // Get valid students
+    const activeStuds = await db.students.where("teacherId").equals(selectedTeacherId).and((s) => s.status === "نشط").toArray();
+
+    let newRecords: DailyRecord[] = [];
+    if (existingSession) {
+      newRecords = existingSession.records.map(r => r.attendance === "" ? { ...r, attendance: "حاضر" } : r);
+      activeStuds.forEach(s => {
+         if (!newRecords.find(r => r.studentId === s.id)) {
+           newRecords.push({ studentId: s.id, attendance: "حاضر", memorization: "لم يحفظ", review: null, behavior: null, surahId: s.currentSurahId });
+         }
+      });
+    } else {
+      newRecords = activeStuds.map(s => ({ studentId: s.id, attendance: "حاضر", memorization: "لم يحفظ", review: null, behavior: null, surahId: s.currentSurahId }));
+    }
+
+    await createOrUpdateSession({
+      id: sessionId,
+      schoolId: school.id,
+      teacherId: selectedTeacherId,
+      date: targetDateStr,
+      sessionNumber: 1,
+      sessionType: existingSession?.sessionType || "حصة أساسية",
+      teacherAbsenceReason: existingSession?.teacherAbsenceReason || "",
+      records: newRecords
+    });
+
+    // Refresh view
+    const startStr = format(startOfWeek(new Date(selectedDate), { weekStartsOn: 0 }), "yyyy-MM-dd");
+    const endStr = format(endOfWeek(new Date(selectedDate), { weekStartsOn: 0 }), "yyyy-MM-dd");
+    const updatedList = await getSessionsByDateRange(selectedTeacherId, startStr, endStr);
+    setSessionsList(updatedList);
+    setSaving(false);
   };
 
   // ─── تقرير WhatsApp ───────────────────────────────────────
@@ -678,6 +831,37 @@ function SessionsPage() {
         </div>
       </div>
 
+      {/* ─── أزرار التبديل بنظام العرض ─── */}
+      <div className="flex bg-gray-100 p-1 rounded-2xl w-full sm:w-fit mx-auto border border-gray-200">
+        <button
+          onClick={() => setViewMode("daily")}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-black transition-all ${
+            viewMode === "daily" ? "bg-white text-[var(--color-primary)] shadow-sm" : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          <LayoutGrid className="w-4 h-4" />
+          اليوم
+        </button>
+        <button
+          onClick={() => setViewMode("weekly")}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-black transition-all ${
+            viewMode === "weekly" ? "bg-white text-[var(--color-primary)] shadow-sm" : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          <ClipboardList className="w-4 h-4" />
+          أسبوعي
+        </button>
+        <button
+          onClick={() => setViewMode("monthly")}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-black transition-all ${
+            viewMode === "monthly" ? "bg-white text-[var(--color-primary)] shadow-sm" : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          <CalendarDays className="w-4 h-4" />
+          شهري
+        </button>
+      </div>
+
       {/* ─── فلتر المعلم (للمدراء فقط) ─── */}
       {(isPrincipal || user?.role === "super_admin") && teachers.length > 0 && (
         <div className="bg-white rounded-2xl border border-[var(--color-border)] p-4 flex items-center justify-between">
@@ -697,43 +881,6 @@ function SessionsPage() {
         </div>
       )}
 
-      {/* ─── تاريخ الميلادي + اختيار الحصة ─── */}
-      <div className="bg-white rounded-2xl border border-[var(--color-border)] p-4 flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="flex-1">
-          <p className="text-base font-black text-gray-800" style={{ fontFamily: "var(--font-headline)" }}>
-            {formatArabicDate(selectedDate)}
-          </p>
-          {session && (
-            <p className="text-xs text-[var(--color-primary)] font-bold mt-0.5 flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              حصة مسجّلة — {session.sessionType}
-            </p>
-          )}
-          {!session && !loading && (
-            <p className="text-xs text-gray-400 font-medium mt-0.5">
-              لم تُسجَّل حصة لهذا اليوم بعد
-            </p>
-          )}
-        </div>
-
-        {/* رقم الحصة */}
-        <div className="flex gap-2">
-          {([1, 2] as const).map((n) => (
-            <button
-              key={n}
-              onClick={() => setSessionNum(n)}
-              className={`flex-1 sm:flex-none px-5 py-2 rounded-xl text-sm font-black transition-all ${
-                sessionNum === n
-                  ? "bg-[var(--color-primary)] text-white shadow-sm"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              حصة {n === 1 ? "أولى" : "ثانية"}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {loading ? (
         <div className="bg-white rounded-2xl border border-[var(--color-border)] p-16 flex items-center justify-center">
           <div className="text-center">
@@ -741,8 +888,68 @@ function SessionsPage() {
             <p className="text-sm text-gray-400 font-medium">جارٍ التحميل...</p>
           </div>
         </div>
+      ) : viewMode === "monthly" ? (
+        <SessionCalendar
+          currentDate={new Date(selectedDate)}
+          onDateChange={(date) => setSelectedDate(format(date, "yyyy-MM-dd"))}
+          onDayClick={(dateStr, sn) => {
+            setSelectedDate(dateStr);
+            if (sn) setSessionNum(sn);
+            setViewMode("daily");
+          }}
+          sessionsList={sessionsList}
+        />
+      ) : viewMode === "weekly" ? (
+        <WeeklyTable
+          currentDate={new Date(selectedDate)}
+          onDateChange={(date) => setSelectedDate(format(date, "yyyy-MM-dd"))}
+          onDayClick={(dateStr, sn) => {
+            setSelectedDate(dateStr);
+            if (sn) setSessionNum(sn);
+            setViewMode("daily");
+          }}
+          onBulkAttend={handleBulkTemporalAttend}
+          sessionsList={sessionsList}
+          students={students}
+        />
       ) : (
         <>
+          {/* ─── تاريخ الميلادي + اختيار الحصة ─── */}
+          <div className="bg-white rounded-2xl border border-[var(--color-border)] p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1">
+              <p className="text-base font-black text-gray-800" style={{ fontFamily: "var(--font-headline)" }}>
+                {formatArabicDate(selectedDate)}
+              </p>
+              {session && (
+                <p className="text-xs text-[var(--color-primary)] font-bold mt-0.5 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  حصة مسجّلة — {session.sessionType}
+                </p>
+              )}
+              {!session && !loading && (
+                <p className="text-xs text-gray-400 font-medium mt-0.5">
+                  لم تُسجَّل حصة لهذا اليوم بعد
+                </p>
+              )}
+            </div>
+
+            {/* رقم الحصة */}
+            <div className="flex gap-2">
+              {([1, 2] as const).map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setSessionNum(n)}
+                  className={`flex-1 sm:flex-none px-5 py-2 rounded-xl text-sm font-black transition-all ${
+                    sessionNum === n
+                      ? "bg-[var(--color-primary)] text-white shadow-sm"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  حصة {n === 1 ? "أولى" : "ثانية"}
+                </button>
+              ))}
+            </div>
+          </div>
           {/* ─── إعداد الحصة ─── */}
           <SessionSetup
             sessionType={sessionType}
@@ -753,6 +960,7 @@ function SessionsPage() {
             onChangeSurah={(id, from, to) => { setSurahId(id); setFromVerse(from); setToVerse(to); setSaved(false); }}
             teacherAbsenceReason={absenceReason}
             onChangeAbsenceReason={(r) => { setAbsenceReason(r); setSaved(false); }}
+            sessionNum={sessionNum}
           />
 
           {/* ─── قائمة الطلاب ─── */}
@@ -784,6 +992,46 @@ function SessionsPage() {
                     </div>
                   </div>
 
+                  {/* إجراءات سريعة (Bulk Actions) */}
+                  <div className="px-4 py-2 bg-white border-b border-gray-100 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => {
+                        setRecords(prev => prev.map(r => r.attendance === "" ? { ...r, attendance: "حاضر", memorization: r.memorization || "لم يحفظ" } : r));
+                        setSaved(false);
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    >
+                      تحضير الجميع
+                    </button>
+                    <button
+                      onClick={() => {
+                        setRecords(prev => prev.map(r => ["حاضر", "متأخر", "تعويض"].includes(r.attendance) ? { ...r, review: true } : r));
+                        setSaved(false);
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    >
+                      مراجعة الجميع
+                    </button>
+                    <button
+                      onClick={() => {
+                        setRecords(prev => prev.map(r => ["حاضر", "متأخر", "تعويض"].includes(r.attendance) ? { ...r, behavior: "هادئ" } : r));
+                        setSaved(false);
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    >
+                      هدوء الجميع
+                    </button>
+                    <button
+                      onClick={() => {
+                        setRecords(prev => prev.map(r => ["حاضر", "متأخر", "تعويض"].includes(r.attendance) && !r.memorization ? { ...r, memorization: "جيد" } : r));
+                        setSaved(false);
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    >
+                      تسميع جيد للجميع
+                    </button>
+                  </div>
+
                   {/* الطلاب */}
                   {students.map((student) => {
                     const rec = records.find((r: DailyRecord) => r.studentId === student.id) ?? {
@@ -802,6 +1050,7 @@ function SessionsPage() {
                         onChange={(patch) => updateRecord(student.id, patch)}
                         sessionSurahId={surahId}
                         enableTajweedTracking={school?.settings?.enableTajweedTracking ?? false}
+                        sessionNum={sessionNum}
                       />
                     );
                   })}
@@ -875,6 +1124,71 @@ function SessionsPage() {
           </AnimatePresence>
         </>
       )}
+
+      {/* نافذة تعليل الغياب التراجعي */}
+      <AnimatePresence>
+        {absencePrompt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl shadow-xl border border-gray-100 max-w-sm w-full p-6 relative overflow-hidden"
+            >
+              <button
+                onClick={() => setAbsencePrompt(null)}
+                className="absolute top-4 left-4 p-2 text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              
+              <div className="mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center mb-4">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-black text-gray-900 mb-1">تعليل الغياب السابق</h3>
+                <p className="text-sm font-bold text-gray-500">
+                  كان الطالب ({students.find(s => s.id === absencePrompt.studentId)?.fullName}) غائباً لمدّة {absencePrompt.sessionsToUpdate.length} حصة متتالية قبل حضوره اليوم. ما هو سبب الغياب؟
+                </p>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <div className="flex flex-wrap gap-2">
+                  {absencePresets.map(preset => (
+                    <button
+                      key={preset}
+                      onClick={() => setAbsenceReasonText(preset)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                        absenceReasonText === preset
+                          ? "bg-[var(--color-primary)] text-white"
+                          : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  placeholder="أو اكتب تفاصيل السبب يدوياً هنا..."
+                  value={absenceReasonText}
+                  onChange={(e) => setAbsenceReasonText(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-[var(--color-border)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/50 text-sm font-bold resize-none h-20"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={submitAbsenceReason}
+                  disabled={!absenceReasonText.trim()}
+                  className="flex-1 py-3 bg-[var(--color-primary)] text-white rounded-xl text-sm font-black shadow-sm disabled:opacity-50"
+                >
+                  حفظ السبب في السجل
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

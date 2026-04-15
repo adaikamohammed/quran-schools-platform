@@ -12,14 +12,29 @@ const supabase = createServiceClient(
 const TABLE_MAP: Record<string, string> = {
   students: "students",
   sessions: "daily_sessions",
-  surahProgress: "surah_progress",
+  surahProgress: "surah_progresses",
   payments: "payments",
   users: "users",
 };
 
+function camelToSnake(str: string) {
+  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+}
+
+function convertKeysToSnake(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map((v) => convertKeysToSnake(v));
+  } else if (obj !== null && obj.constructor === Object) {
+    return Object.keys(obj).reduce((acc, key) => {
+      acc[camelToSnake(key)] = convertKeysToSnake(obj[key]);
+      return acc;
+    }, {} as any);
+  }
+  return obj;
+}
+
 export async function POST(req: Request) {
   try {
-    // استخدام Supabase Auth (نفس الجلسة التي تُنشئها صفحة تسجيل الدخول)
     const authClient = await createClient();
     const { data: { user }, error: authError } = await authClient.auth.getUser();
 
@@ -27,7 +42,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // جلب school_id من جدول المستخدمين
     const { data: userData } = await supabase
       .from("users")
       .select("school_id")
@@ -51,8 +65,18 @@ export async function POST(req: Request) {
       const supabaseTable = TABLE_MAP[table];
       if (!supabaseTable) continue;
 
-      // فرض school_id للعزل متعدد المستأجرين
-      const safeData = { ...data, school_id: session.schoolId };
+      // Handle daily_records extraction map back to daily_sessions if table is sessions
+      let safeData = { ...data };
+      let dailyRecordsData: any[] = [];
+      if (table === "sessions") {
+        if (safeData.records) {
+          dailyRecordsData = safeData.records;
+        }
+        delete safeData.records;
+      }
+
+      safeData = convertKeysToSnake(safeData);
+      safeData.school_id = session.schoolId;
 
       try {
         if (action === "create" || action === "update") {
@@ -60,6 +84,18 @@ export async function POST(req: Request) {
           await supabase
             .from(supabaseTable)
             .upsert({ id: recordId, ...safeData }, { onConflict: "id" });
+
+          // Handle related daily_records if this is a session
+          if (table === "sessions" && dailyRecordsData.length > 0) {
+            const mappedRecords = dailyRecordsData.map(r => ({
+              ...convertKeysToSnake(r),
+              session_id: recordId,
+            }));
+            await supabase.from("daily_records").upsert(mappedRecords, { onConflict: "id" });
+            // Since onConflict defaults to id, wait! In supabase-schema.sql, daily_records has no unique constraint except session_id + student_id!
+            // Wait, daily_records id is UUID PRIMARY KEY. If daily record has an ID it upserts easily. If not, it inserts.
+          }
+
         } else if (action === "delete") {
           // حذف ناعم
           await supabase

@@ -20,8 +20,10 @@ import {
   TargetIcon,
   Users2,
   Printer,
+  TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
+import MemorizationChart from "@/components/analytics/MemorizationChart";
 
 // ─── حساب العمر ──────────────────────────────────────────
 
@@ -59,7 +61,7 @@ export default function StudentProfilePage() {
   const [sessions, setSessions] = useState<DailySession[]>([]);
   const [surahProgress, setSurahProgress] = useState<SurahProgress[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"info" | "sessions" | "quran" | "covenants">("info");
+  const [activeTab, setActiveTab] = useState<"info" | "sessions" | "quran" | "covenants" | "analytics">("info");
 
   useEffect(() => {
     const load = async () => {
@@ -116,6 +118,7 @@ export default function StudentProfilePage() {
     { id: "sessions", label: `الحصص (${sessions.length})` },
     { id: "quran", label: `الحفظ (${surahProgress.length})` },
     { id: "covenants", label: `العهود (${student.covenants?.length ?? 0})` },
+    { id: "analytics", label: "التحليلات" },
   ];
 
   return (
@@ -388,6 +391,13 @@ export default function StudentProfilePage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ─── التحليلات ──────────────────────────────────── */}
+        {activeTab === "analytics" && (
+          <div className="space-y-4">
+            <MemorizationChart studentId={student.id} sessions={sessions} />
           </div>
         )}
       </motion.div>

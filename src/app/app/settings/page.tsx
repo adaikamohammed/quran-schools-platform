@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { saveSchool } from "@/lib/storage/db";
 import type { School } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
+import Modal from "@/components/ui/Modal";
 import {
   Settings, Save, Loader2, Building2,
   Mail, Phone, Calendar, CheckCircle2,
@@ -35,93 +36,60 @@ function CountryPickerModal({
   );
 
   return (
-    <>
-      {/* Backdrop */}
-      <motion.div
-        key="backdrop"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
-      />
-      {/* Modal */}
-      <motion.div
-        key="modal"
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        transition={{ duration: 0.2 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      >
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden" dir="rtl">
-          {/* Header */}
-          <div className="flex items-center justify-between p-5 border-b border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[var(--color-primary)]/10 flex items-center justify-center">
-                <Globe className="w-5 h-5 text-[var(--color-primary)]" />
-              </div>
-              <div>
-                <h3 className="font-black text-gray-900 text-base" style={{ fontFamily: "var(--font-headline)" }}>
-                  اختر دولتك
-                </h3>
-                <p className="text-xs text-gray-400">سيتم تعيين رمز الاتصال تلقائياً</p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
-            >
-              <X className="w-4 h-4 text-gray-600" />
-            </button>
-          </div>
-
-          {/* Search */}
-          <div className="p-4 border-b border-gray-100">
-            <div className="relative">
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                ref={inputRef}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="ابحث عن دولتك..."
-                className="w-full pr-9 pl-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[var(--color-primary)] bg-gray-50"
-              />
-            </div>
-          </div>
-
-          {/* Countries List */}
-          <div className="overflow-y-auto max-h-72 p-2 space-y-0.5">
-            {filtered.length === 0 ? (
-              <p className="text-center text-gray-400 text-sm py-8">لا توجد نتائج</p>
-            ) : (
-              filtered.map((country) => (
-                <button
-                  key={country.name}
-                  onClick={() => { onChange(country); onClose(); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all hover:bg-[var(--color-primary)]/5 ${
-                    value === country.name
-                      ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
-                      : "text-gray-700"
-                  }`}
-                >
-                  <span className="text-xl">{country.flag}</span>
-                  <span className="flex-1 text-right">{country.name}</span>
-                  {country.dial && (
-                    <span className="text-xs font-black text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg" dir="ltr">
-                      {country.dial}
-                    </span>
-                  )}
-                  {value === country.name && (
-                    <CheckCircle2 className="w-4 h-4 text-[var(--color-primary)] shrink-0" />
-                  )}
-                </button>
-              ))
-            )}
+    <Modal
+      open={true}
+      onClose={onClose}
+      size="sm"
+      title="اختر دولتك"
+      description="سيتم تعيين رمز الاتصال تلقائياً"
+      icon={<div className="w-10 h-10 rounded-2xl bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)]"><Globe className="w-5 h-5" /></div>}
+    >
+      <div className="flex flex-col h-[60vh] max-h-[500px]" dir="rtl">
+        {/* Search */}
+        <div className="p-4 border-b border-gray-100 shrink-0">
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              ref={inputRef}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ابحث عن دولتك..."
+              className="w-full pr-9 pl-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[var(--color-primary)] bg-gray-50"
+            />
           </div>
         </div>
-      </motion.div>
-    </>
+
+        {/* Countries List */}
+        <div className="overflow-y-auto p-2 space-y-0.5 flex-1">
+          {filtered.length === 0 ? (
+            <p className="text-center text-gray-400 text-sm py-8">لا توجد نتائج</p>
+          ) : (
+            filtered.map((country) => (
+              <button
+                key={country.name}
+                onClick={() => { onChange(country); onClose(); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all hover:bg-[var(--color-primary)]/5 ${
+                  value === country.name
+                    ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
+                    : "text-gray-700"
+                }`}
+              >
+                <span className="text-xl">{country.flag}</span>
+                <span className="flex-1 text-right">{country.name}</span>
+                {country.dial && (
+                  <span className="text-xs font-black text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg" dir="ltr">
+                    {country.dial}
+                  </span>
+                )}
+                {value === country.name && (
+                  <CheckCircle2 className="w-4 h-4 text-[var(--color-primary)] shrink-0" />
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </Modal>
   );
 }
 

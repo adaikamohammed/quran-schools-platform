@@ -178,7 +178,7 @@ async function seedSessions(schoolId, teacherIds, grouped) {
         tajweedLevel: rnd(["ممتاز","جيد","مقبول"]),
       }));
 
-      const sessionId = `${date}-${tid.slice(0,8)}-${(s % 2) + 1}`;
+      const sessionId = uuid();
       const { error } = await supabase.from("daily_sessions").insert({
         id: sessionId,
         school_id: schoolId,
@@ -186,13 +186,30 @@ async function seedSessions(schoolId, teacherIds, grouped) {
         date,
         session_number: (s % 2) + 1,
         session_type: rnd(STYPES),
-        records: JSON.stringify(records),
         created_at: now,
         updated_at: now,
       });
 
-      if (error) console.error(`  ❌ حصة ${date} / ${TEACHERS[g].group}:`, error.message);
-      else n++;
+      if (error) {
+        console.error(`  ❌ حصة ${date} / ${TEACHERS[g].group}:`, error.message);
+      } else {
+        const d_records = stuIds.map(studentId => ({
+          id: uuid(),
+          session_id: sessionId,
+          student_id: studentId,
+          attendance: rnd(ATT),
+          memorization: rnd(MEM),
+          review: Math.random() > 0.5,
+          notes: Math.random() > 0.8 ? "يحتاج متابعة" : "",
+          tasmie_from_verse: 1,
+          tasmie_to_verse: Math.floor(Math.random() * 10) + 5,
+          created_at: now,
+          updated_at: now,
+        }));
+        const { error: recErr } = await supabase.from("daily_records").insert(d_records);
+        if (recErr) console.error(`  ❌ سجلات حصة ${date}:`, recErr.message);
+        else n++;
+      }
     }
     console.log(`  ✅ ${TEACHERS[g].group}: ${DAY_OFFSETS.length} حصة مُسجَّلة`);
   }

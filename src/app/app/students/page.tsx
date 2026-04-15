@@ -7,11 +7,13 @@ import { getDB, getStudentsBySchool, getStudentsByTeacher } from "@/lib/storage/
 import { createStudent, updateStudent, softDeleteStudent } from "@/lib/storage/mutations";
 import type { Student, SubscriptionTier, MemorizationAmount, AppUser } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
+import Modal, { ModalSection } from "@/components/ui/Modal";
 import {
   Users, Plus, Search, Filter, X, ChevronDown,
   Phone, BookOpen, Calendar, UserCheck, UserX,
   MoreVertical, Edit, Trash2, Eye, Check,
   ArrowUpDown, Download, Share2, MessageCircle,
+  ArrowLeftRight, Clock, History, Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { getDialCode } from "@/lib/countries";
@@ -19,12 +21,11 @@ import { PhotoPicker } from "@/components/ui/PhotoPicker";
 
 // ─── نموذج إضافة طالب ────────────────────────────────────
 
-const EDUCATION_LEVELS = [
-  "روضة", "تمهيدي",
-  "1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي", "6 ابتدائي",
-  "1 متوسط / إعدادي", "2 متوسط / إعدادي", "3 متوسط / إعدادي", "4 متوسط",
-  "1 ثانوي", "2 ثانوي", "3 ثانوي",
-  "جامعي", "خريج / غير متمدرس"
+const EDUCATION_GROUPS = [
+  { label: "الطور الابتدائي", levels: ["1 ابتدائي", "2 ابتدائي", "3 ابتدائي", "4 ابتدائي", "5 ابتدائي"] },
+  { label: "الطور المتوسط",   levels: ["1 متوسط", "2 متوسط", "3 متوسط", "4 متوسط"] },
+  { label: "الطور الثانوي",  levels: ["1 ثانوي", "2 ثانوي", "3 ثانوي", "بكالوريا"] },
+  { label: "أخرى",           levels: ["روضة", "تحضيري", "جامعي", "متوقف عن الدراسة"] },
 ];
 const MEMORIZATION_AMOUNTS: MemorizationAmount[] = ["ثمن", "ربع", "نصف", "صفحة", "أكثر"];
 const SUBSCRIPTION_TIERS: SubscriptionTier[] = ["فئة الأصاغر", "فئة الأكابر"];
@@ -69,6 +70,7 @@ function StudentModal({
   initial,
   groups,
   schoolCountry,
+  defaultGroupName,
 }: {
   open: boolean;
   onClose: () => void;
@@ -76,6 +78,7 @@ function StudentModal({
   initial?: StudentFormData;
   groups: string[];
   schoolCountry?: string;
+  defaultGroupName?: string;
 }) {
   const [form, setForm] = useState<StudentFormData>(initial ?? EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -94,12 +97,12 @@ function StudentModal({
         }
       } else {
         const dial = getDialCode(schoolCountry);
-        setForm({ ...EMPTY_FORM, phone1: dial });
+        setForm({ ...EMPTY_FORM, phone1: dial, groupName: defaultGroupName ?? "" });
         setAgeInput("");
       }
       setErrors({});
     }
-  }, [open, initial, schoolCountry]);
+  }, [open, initial, schoolCountry, defaultGroupName]);
 
   // Handle Age Input
   const handleAgeChange = (val: string) => {
@@ -146,248 +149,461 @@ function StudentModal({
     onClose();
   };
 
+  const iconEl = (
+    <div className="relative">
+      <PhotoPicker
+        currentPhoto={form.photoURL}
+        displayName={form.fullName || "ط"}
+        size="md"
+        onPhotoChange={(url) => set("photoURL", url ?? "")}
+      />
+    </div>
+  );
+
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            key="backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
-          />
-          {/* Modal */}
-          <motion.div
-            key="modal"
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="xl"
+      title={initial ? "تعديل بيانات الطالب" : "إضافة طالب جديد"}
+      description={initial ? "انقر الصورة لتغييرها" : "أدخل بيانات الطالب بالكامل"}
+      icon={iconEl}
+      footer={
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="btn-secondary flex-1 justify-center py-3">
+            إلغاء
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={handleSubmit as any}
+            className="btn-primary flex-1 justify-center py-3 text-sm"
           >
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-100 sticky top-0 bg-white rounded-t-3xl z-10">
-                <div className="flex items-center gap-4">
-                  <PhotoPicker
-                    currentPhoto={form.photoURL}
-                    displayName={form.fullName || "ط"}
-                    size="md"
-                    onPhotoChange={(url) => set("photoURL", url ?? "")}
-                  />
-                  <div>
-                    <h2 className="text-xl font-black text-gray-900" style={{ fontFamily: "var(--font-headline)" }}>
-                      {initial ? "تعديل بيانات الطالب" : "إضافة طالب جديد"}
-                    </h2>
-                    <p className="text-sm text-gray-400 mt-0.5">{initial ? "انقر الصورة لتغييرها" : "أدخل بيانات الطالب بالكامل"}</p>
-                  </div>
-                </div>
-                <button onClick={onClose} className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
-                  <X className="w-4 h-4 text-gray-600" />
-                </button>
-              </div>
+            {saving ? "جارٍ الحفظ..." : initial ? "حفظ التعديلات" : "إضافة الطالب"}
+            {!saving && <Check className="w-4 h-4" />}
+          </button>
+        </div>
+      }
+    >
+      <form onSubmit={handleSubmit} className="p-6 space-y-8">
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                {/* القسم 1: معلومات الطالب */}
-                <div>
-                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">معلومات الطالب</p>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    {/* الاسم */}
-                    <div className="sm:col-span-2 space-y-1.5">
-                      <label className="text-sm font-bold text-gray-700">الاسم الكامل *</label>
-                      <input
-                        value={form.fullName}
-                        onChange={(e) => set("fullName", e.target.value)}
-                        placeholder="مثال: أحمد محمد بن يوسف"
-                        className={`input-field ${errors.fullName ? "border-red-400" : ""}`}
-                      />
-                      {errors.fullName && <p className="text-xs text-red-500">{errors.fullName}</p>}
-                    </div>
+        {/* ─── القسم 1: معلومات الطالب */}
+        <ModalSection title="معلومات الطالب">
+          <div className="grid sm:grid-cols-2 gap-4">
 
-                    {/* الجنس */}
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-gray-700">الجنس</label>
-                      <div className="flex gap-3">
-                        {(["ذكر", "أنثى"] as const).map((g) => (
-                          <button
-                            key={g}
-                            type="button"
-                            onClick={() => set("gender", g)}
-                            className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all ${
-                              form.gender === g
-                                ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]"
-                                : "bg-white text-gray-600 border-gray-200 hover:border-[var(--color-primary)]/40"
-                            }`}
-                          >
-                            {g === "ذكر" ? "👦 ذكر" : "👧 أنثى"}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* تاريخ الميلاد والعمر */}
-                    <div className="space-y-1.5 sm:col-span-2">
-                       <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-bold text-gray-700">تاريخ الميلاد *</label>
-                          <input
-                            type="date"
-                            value={form.birthDate}
-                            onChange={(e) => handleBirthDateChange(e.target.value)}
-                            max={new Date().toISOString().slice(0, 10)}
-                            className={`input-field ${errors.birthDate ? "border-red-400" : ""}`}
-                          />
-                          {errors.birthDate && <p className="text-xs text-red-500">{errors.birthDate}</p>}
-                        </div>
-                        <div>
-                          <label className="text-sm font-bold text-gray-700">العمر (سنوات)</label>
-                          <input
-                            type="number"
-                            value={ageInput}
-                            onChange={(e) => handleAgeChange(e.target.value)}
-                            className="input-field"
-                            placeholder="مثال: 12"
-                          />
-                        </div>
-                       </div>
-                    </div>
-
-                    {/* المستوى الدراسي */}
-                    <div className="space-y-1.5 sm:col-span-2">
-                      <label className="text-sm font-bold text-gray-700">المستوى الدراسي</label>
-                      <select value={form.educationalLevel} onChange={(e) => set("educationalLevel", e.target.value)} className="input-field">
-                        {EDUCATION_LEVELS.map((l) => <option key={l}>{l}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* القسم 2: ولي الأمر */}
-                <div>
-                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">ولي الأمر</p>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="sm:col-span-2 space-y-1.5">
-                      <label className="text-sm font-bold text-gray-700">اسم ولي الأمر *</label>
-                      <input
-                        value={form.guardianName}
-                        onChange={(e) => set("guardianName", e.target.value)}
-                        placeholder="الاسم الكامل"
-                        className={`input-field ${errors.guardianName ? "border-red-400" : ""}`}
-                      />
-                      {errors.guardianName && <p className="text-xs text-red-500">{errors.guardianName}</p>}
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-gray-700">هاتف 1 *</label>
-                      <input
-                        value={form.phone1}
-                        onChange={(e) => set("phone1", e.target.value)}
-                        placeholder="+213 6XX XXX XXX"
-                        dir="ltr"
-                        className={`input-field text-right ${errors.phone1 ? "border-red-400" : ""}`}
-                      />
-                      {errors.phone1 && <p className="text-xs text-red-500">{errors.phone1}</p>}
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-gray-700">هاتف 2 (اختياري)</label>
-                      <input
-                        value={form.phone2}
-                        onChange={(e) => set("phone2", e.target.value)}
-                        placeholder="+213 6XX XXX XXX"
-                        dir="ltr"
-                        className="input-field text-right"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* القسم 3: المجموعة والاشتراك */}
-                <div>
-                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">المجموعة والاشتراك</p>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-gray-700">الفوج / المجموعة *</label>
-                      <input
-                        value={form.groupName}
-                        onChange={(e) => set("groupName", e.target.value)}
-                        placeholder="مثال: فوج النور"
-                        list="groups-list"
-                        className={`input-field ${errors.groupName ? "border-red-400" : ""}`}
-                      />
-                      <datalist id="groups-list">
-                        {groups.map((g) => <option key={g} value={g} />)}
-                      </datalist>
-                      {errors.groupName && <p className="text-xs text-red-500">{errors.groupName}</p>}
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-gray-700">فئة الاشتراك</label>
-                      <select value={form.subscriptionTier} onChange={(e) => set("subscriptionTier", e.target.value as SubscriptionTier)} className="input-field">
-                        {SUBSCRIPTION_TIERS.map((t) => <option key={t}>{t}</option>)}
-                      </select>
-                      <div className="text-[10.5px] text-gray-400 mt-1 flex items-center pr-1 border-r-2 border-indigo-200">فئة الإصاغر تكون مخفضة السعر، يحدد المدير السعر من الإعدادات.</div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-gray-700">كمية التحفيظ اليومي</label>
-                      <select value={form.dailyMemorizationAmount} onChange={(e) => set("dailyMemorizationAmount", e.target.value as MemorizationAmount)} className="input-field">
-                        {MEMORIZATION_AMOUNTS.map((a) => <option key={a}>{a}</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-gray-700">السور المحفوظة (عدد)</label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={114}
-                        value={form.memorizedSurahsCount}
-                        onChange={(e) => set("memorizedSurahsCount", +e.target.value)}
-                        className="input-field"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* ملاحظات */}
-                <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-gray-700">ملاحظات (اختياري)</label>
-                  <textarea
-                    value={form.notes}
-                    onChange={(e) => set("notes", e.target.value)}
-                    rows={3}
-                    placeholder="أي معلومات إضافية عن الطالب..."
-                    className="input-field resize-none"
-                  />
-                </div>
-
-                {/* أزرار */}
-                <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={onClose} className="btn-secondary flex-1 justify-center py-3">
-                    إلغاء
-                  </button>
-                  <button type="submit" disabled={saving} className="btn-primary flex-1 justify-center py-3">
-                    {saving ? "جارٍ الحفظ..." : initial ? "حفظ التعديلات" : "إضافة الطالب"}
-                    {!saving && <Check className="w-4 h-4" />}
-                  </button>
-                </div>
-              </form>
+            {/* الاسم */}
+            <div className="sm:col-span-2 space-y-1.5">
+              <label className="text-sm font-bold text-gray-700 dark:text-gray-300">الاسم الكامل *</label>
+              <input
+                value={form.fullName}
+                onChange={(e) => set("fullName", e.target.value)}
+                placeholder="مثال: أحمد محمد بن يوسف"
+                className={`input-field ${errors.fullName ? "border-red-400" : ""}`}
+              />
+              {errors.fullName && <p className="text-xs text-red-500">{errors.fullName}</p>}
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+
+            {/* الجنس */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-gray-700 dark:text-gray-300">الجنس</label>
+              <div className="flex gap-2">
+                {(["ذكر", "أنثى"] as const).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => set("gender", g)}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all ${
+                      form.gender === g
+                        ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm"
+                        : "bg-white dark:bg-[var(--color-card)] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-white/10 hover:border-[var(--color-primary)]/40"
+                    }`}
+                  >
+                    {g === "ذكر" ? "👦 ذكر" : "👧 أنثى"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* تاريخ + العمر */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-gray-700 dark:text-gray-300">تاريخ الميلاد *</label>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="date"
+                  value={form.birthDate}
+                  onChange={(e) => handleBirthDateChange(e.target.value)}
+                  max={new Date().toISOString().slice(0, 10)}
+                  className={`input-field ${errors.birthDate ? "border-red-400" : ""}`}
+                />
+                <input
+                  type="number"
+                  value={ageInput}
+                  onChange={(e) => handleAgeChange(e.target.value)}
+                  className="input-field"
+                  placeholder="العمر"
+                />
+              </div>
+              {errors.birthDate && <p className="text-xs text-red-500">{errors.birthDate}</p>}
+            </div>
+
+          </div>
+
+          {/* المستوى الدراسي — بطاقات */}
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-gray-700 dark:text-gray-300">المستوى الدراسي</label>
+            <div className="space-y-3">
+              {EDUCATION_GROUPS.map((group) => (
+                <div key={group.label}>
+                  <p className="text-[10px] font-black text-gray-400 dark:text-gray-600 uppercase tracking-widest mb-1.5">
+                    {group.label}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {group.levels.map((lvl) => (
+                      <button
+                        key={lvl}
+                        type="button"
+                        onClick={() => set("educationalLevel", lvl)}
+                        className={`px-3.5 py-1.5 rounded-xl text-sm font-bold border-2 transition-all ${
+                          form.educationalLevel === lvl
+                            ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm"
+                            : "bg-white dark:bg-[var(--color-card)] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-white/10 hover:border-[var(--color-primary)]/40"
+                        }`}
+                      >
+                        {lvl}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </ModalSection>
+
+        {/* ─── القسم 2: ولي الأمر */}
+        <ModalSection title="ولي الأمر">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2 space-y-1.5">
+              <label className="text-sm font-bold text-gray-700 dark:text-gray-300">اسم ولي الأمر *</label>
+              <input
+                value={form.guardianName}
+                onChange={(e) => set("guardianName", e.target.value)}
+                placeholder="الاسم الكامل"
+                className={`input-field ${errors.guardianName ? "border-red-400" : ""}`}
+              />
+              {errors.guardianName && <p className="text-xs text-red-500">{errors.guardianName}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-gray-700 dark:text-gray-300">هاتف 1 *</label>
+              <input
+                value={form.phone1}
+                onChange={(e) => set("phone1", e.target.value)}
+                placeholder="+213 6XX XXX XXX"
+                dir="ltr"
+                className={`input-field text-right ${errors.phone1 ? "border-red-400" : ""}`}
+              />
+              {errors.phone1 && <p className="text-xs text-red-500">{errors.phone1}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-gray-700 dark:text-gray-300">هاتف 2 (اختياري)</label>
+              <input
+                value={form.phone2}
+                onChange={(e) => set("phone2", e.target.value)}
+                placeholder="+213 6XX XXX XXX"
+                dir="ltr"
+                className="input-field text-right"
+              />
+            </div>
+          </div>
+        </ModalSection>
+
+        {/* ─── القسم 3: الفوج والاشتراك */}
+        <ModalSection title="المجموعة والاشتراك">
+          <div className="grid sm:grid-cols-2 gap-4">
+
+            {/* الفوج */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-gray-700 dark:text-gray-300">الفوج / المجموعة *</label>
+              {defaultGroupName ? (
+                <div className="input-field bg-gray-50 dark:bg-white/3 text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                  <span>🏷️</span>
+                  <span className="font-bold">{form.groupName}</span>
+                  <span className="text-[10px] text-gray-400 mr-auto">مُعيَّن تلقائياً</span>
+                </div>
+              ) : (
+                <>
+                  <input
+                    value={form.groupName}
+                    onChange={(e) => set("groupName", e.target.value)}
+                    placeholder="مثال: فوج النور"
+                    list="groups-list"
+                    className={`input-field ${errors.groupName ? "border-red-400" : ""}`}
+                  />
+                  <datalist id="groups-list">
+                    {groups.map((g) => <option key={g} value={g} />)}
+                  </datalist>
+                </>
+              )}
+              {errors.groupName && <p className="text-xs text-red-500">{errors.groupName}</p>}
+            </div>
+
+            {/* فئة الاشتراك */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-gray-700 dark:text-gray-300">فئة الاشتراك</label>
+              <div className="flex gap-2">
+                {SUBSCRIPTION_TIERS.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => set("subscriptionTier", t)}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all ${
+                      form.subscriptionTier === t
+                        ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm"
+                        : "bg-white dark:bg-[var(--color-card)] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-white/10 hover:border-[var(--color-primary)]/40"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-400 pr-1 border-r-2 border-indigo-200">
+                فئة الأصاغر تكون مخفضة السعر.
+              </p>
+            </div>
+
+            {/* كمية التحفيظ */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-gray-700 dark:text-gray-300">كمية التحفيظ اليومي</label>
+              <div className="flex flex-wrap gap-2">
+                {MEMORIZATION_AMOUNTS.map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => set("dailyMemorizationAmount", a)}
+                    className={`px-3.5 py-1.5 rounded-xl text-sm font-bold border-2 transition-all ${
+                      form.dailyMemorizationAmount === a
+                        ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm"
+                        : "bg-white dark:bg-[var(--color-card)] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-white/10 hover:border-[var(--color-primary)]/40"
+                    }`}
+                  >
+                    {a}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* عدد السور */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-gray-700 dark:text-gray-300">السور المحفوظة (عدد)</label>
+              <input
+                type="number" min={0} max={114}
+                value={form.memorizedSurahsCount}
+                onChange={(e) => set("memorizedSurahsCount", +e.target.value)}
+                className="input-field"
+              />
+            </div>
+
+          </div>
+        </ModalSection>
+
+        {/* ─── القسم 4: ملاحظات */}
+        <ModalSection title="ملاحظات">
+          <textarea
+            value={form.notes}
+            onChange={(e) => set("notes", e.target.value)}
+            rows={3}
+            placeholder="أي معلومات إضافية عن الطالب..."
+            className="input-field resize-none"
+          />
+        </ModalSection>
+
+      </form>
+    </Modal>
   );
 }
 
-// ─── بطاقة الطالب ──────────────────────────────────────
+// ─── Modal نقل الطالب إلى فوج آخر ───────────────────────
+
+function TransferModal({
+  student, schoolId, open, onClose, onTransfer,
+}: {
+  student: Student;
+  schoolId: string;
+  open: boolean;
+  onClose: () => void;
+  onTransfer: (student: Student, newTeacherId: string, newGroupName: string, reason: string) => Promise<void>;
+}) {
+  const [teachers, setTeachers] = useState<AppUser[]>([]);
+  const [existingGroups, setExistingGroups] = useState<string[]>([]);
+  const [newTeacherId, setNewTeacherId] = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const TRANSFER_REASONS = [
+    "ترقية بعد ختم جزء",
+    "تغيير توقيت الحضور",
+    "طلب ولي الأمر",
+    "توازن أعداد الأفواج",
+  ];
+
+  useEffect(() => {
+    if (!open) return;
+    const db = getDB();
+    db.users.where("schoolId").equals(schoolId).and(u => u.role === "teacher").toArray().then(setTeachers);
+    db.students.where("schoolId").equals(schoolId).toArray().then(studs => {
+      const groups = [...new Set(studs.map(s => s.groupName))].filter(Boolean);
+      setExistingGroups(groups);
+    });
+    setNewTeacherId("");
+    setNewGroupName("");
+    setReason("");
+  }, [open, schoolId]);
+
+  const handleTransfer = async () => {
+    if (!newTeacherId || !newGroupName || !reason.trim()) return;
+    setSaving(true);
+    await onTransfer(student, newTeacherId, newGroupName, reason.trim());
+    setSaving(false);
+    onClose();
+  };
+
+  const valid = newTeacherId && newGroupName && reason.trim();
+
+  const footer = (
+    <div className="flex gap-3 w-full">
+      <button onClick={onClose} className="btn-secondary flex-1 py-2.5 justify-center text-sm">إلغاء</button>
+      <button onClick={handleTransfer} disabled={!valid || saving}
+        className="btn-primary flex-1 py-2.5 justify-center text-sm disabled:opacity-40">
+        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowLeftRight className="w-4 h-4" />}
+        تأكيد النقل
+      </button>
+    </div>
+  );
+
+  return (
+    <Modal open={open} onClose={onClose} size="md"
+      title="نقل الطالب إلى فوج آخر"
+      description={student.fullName}
+      footer={footer}>
+      <div className="space-y-4 py-2">
+        {/* الفوج الحالي */}
+        <div className="bg-gray-50 rounded-2xl p-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+            <ArrowLeftRight className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="text-xs font-black text-gray-500">من (الفوج الحالي)</p>
+            <p className="text-sm font-black text-gray-800">{student.groupName}</p>
+          </div>
+        </div>
+
+        {/* الشيخ الجديد */}
+        <div className="space-y-1">
+          <label className="text-xs font-black text-gray-500 uppercase tracking-wider">إلى شيخ *</label>
+          <select value={newTeacherId} onChange={e => setNewTeacherId(e.target.value)}
+            className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:border-[var(--color-primary)]/60">
+            <option value="">اختر المعلم الجديد...</option>
+            {teachers.map(t => <option key={t.id} value={t.id}>{t.fullName}</option>)}
+          </select>
+        </div>
+
+        {/* الفوج الجديد */}
+        <div className="space-y-1">
+          <label className="text-xs font-black text-gray-500 uppercase tracking-wider">إلى فوج *</label>
+          <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)}
+            list="transfer-groups-list" placeholder="اسم الفوج الجديد"
+            className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:border-[var(--color-primary)]/60" />
+          <datalist id="transfer-groups-list">
+            {existingGroups.map(g => <option key={g} value={g} />)}
+          </datalist>
+        </div>
+
+        {/* سبب النقل */}
+        <div className="space-y-2">
+          <label className="text-xs font-black text-gray-500 uppercase tracking-wider">سبب النقل *</label>
+          <div className="flex flex-wrap gap-2">
+            {TRANSFER_REASONS.map(r => (
+              <button key={r} type="button" onClick={() => setReason(r)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all ${
+                  reason === r ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]" : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                }`}>{r}</button>
+            ))}
+          </div>
+          <textarea value={reason} onChange={e => setReason(e.target.value)}
+            placeholder="أو اكتب سبباً آخر..."
+            rows={2}
+            className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:border-[var(--color-primary)]/60 resize-none" />
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── تاريخ الطالب (Timeline) ───────────────────────
+function StudentTimelineModal({ student, open, onClose }: { student: Student; open: boolean; onClose: () => void }) {
+  const events: { date: string; title: string; detail: string; color: string; emoji: string }[] = [];
+
+  events.push({ date: student.registrationDate, title: "التسجيل الأول", detail: `دخل الفوج: ${student.groupName}`, color: "bg-emerald-500", emoji: "📋" });
+
+  student.transferHistory?.forEach(t => {
+    if (t.fromGroupName !== "تسجيل مبدئي") {
+      events.push({ date: t.date, title: "نقل بين الأفواج", detail: `${t.fromGroupName} ← ${t.toGroupName} | سبب: ${t.reason}`, color: "bg-blue-500", emoji: "📦" });
+    }
+  });
+
+  student.covenants?.forEach(c => {
+    events.push({ date: c.date, title: `تعهد: ${c.type}`, detail: c.text, color: "bg-amber-500", emoji: "📝" });
+  });
+
+  student.expulsionHistory?.forEach(e => {
+    events.push({ date: e.date, title: "طرد / إيقاف", detail: e.reason, color: "bg-red-500", emoji: "❌" });
+  });
+
+  events.sort((a, b) => a.date.localeCompare(b.date));
+
+  return (
+    <Modal open={open} onClose={onClose} size="md" title="سيرة الطالب" description={student.fullName}>
+      <div className="py-2">
+        {events.length === 0 ? (
+          <p className="text-center text-gray-400 py-8 font-bold">لا يوجد سجل تاريخي بعد</p>
+        ) : (
+          <div className="relative">
+            <div className="absolute right-3.5 top-0 bottom-0 w-0.5 bg-gray-100" />
+            <div className="space-y-5">
+              {events.map((ev, i) => (
+                <div key={i} className="flex gap-4 items-start">
+                  <div className={`w-7 h-7 rounded-full ${ev.color} flex items-center justify-center text-sm shrink-0 z-10 shadow-sm`}>
+                    <span className="text-xs">{ev.emoji}</span>
+                  </div>
+                  <div className="flex-1 bg-gray-50 rounded-2xl p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-black text-gray-800">{ev.title}</p>
+                      <span className="text-[10px] text-gray-400 font-bold">{new Date(ev.date).toLocaleDateString("ar-DZ")}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 font-bold">{ev.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
 
 function StudentCard({
   student,
   onEdit,
   onDelete,
+  onTransfer,
+  onHistory,
 }: {
   student: Student;
   onEdit: (s: Student) => void;
   onDelete: (s: Student) => void;
+  onTransfer: (s: Student) => void;
+  onHistory: (s: Student) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -458,6 +674,20 @@ function StudentCard({
                 >
                   <Edit className="w-4 h-4 text-amber-500" />
                   تعديل
+                </button>
+                <button
+                  onClick={() => { onTransfer(student); setMenuOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-bold text-blue-600 hover:bg-blue-50 transition-colors"
+                >
+                  <ArrowLeftRight className="w-4 h-4" />
+                  نقل إلى فوج آخر
+                </button>
+                <button
+                  onClick={() => { onHistory(student); setMenuOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-bold text-purple-600 hover:bg-purple-50 transition-colors"
+                >
+                  <History className="w-4 h-4" />
+                  سيرة الطالب
                 </button>
                 <button
                   onClick={() => { onDelete(student); setMenuOpen(false); }}
@@ -552,6 +782,8 @@ function StudentsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Student | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
+  const [transferTarget, setTransferTarget] = useState<Student | null>(null);
+  const [timelineTarget, setTimelineTarget] = useState<Student | null>(null);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<"الكل" | "نشط" | "موقوف" | "مطرود">("الكل");
   const [filterGroup, setFilterGroup] = useState("الكل");
@@ -643,6 +875,28 @@ function StudentsPage() {
         ...form,
       });
     }
+    await loadStudents();
+  };
+
+  // نقل الطالب إلى فوج آخر
+  const handleTransfer = async (student: Student, newTeacherId: string, newGroupName: string, reason: string) => {
+    const db = getDB();
+    const newTeacher = await db.users.get(newTeacherId);
+    const transferRecord = {
+      date: new Date().toISOString().split("T")[0],
+      fromTeacherId: student.teacherId,
+      fromTeacherName: teachers.find(t => t.id === student.teacherId)?.fullName ?? "",
+      fromGroupName: student.groupName,
+      toTeacherId: newTeacherId,
+      toTeacherName: newTeacher?.fullName ?? "",
+      toGroupName: newGroupName,
+      reason,
+    };
+    await updateStudent(student.id, {
+      teacherId: newTeacherId,
+      groupName: newGroupName,
+      transferHistory: [...(student.transferHistory ?? []), transferRecord],
+    });
     await loadStudents();
   };
 
@@ -850,6 +1104,8 @@ function StudentsPage() {
                   student={student}
                   onEdit={handleEdit}
                   onDelete={setDeleteTarget}
+                  onTransfer={setTransferTarget}
+                  onHistory={setTimelineTarget}
                 />
               ))}
             </AnimatePresence>
@@ -911,51 +1167,58 @@ function StudentsPage() {
         initial={editFormData}
         groups={groups}
         schoolCountry={school?.country}
+        defaultGroupName={!isPrincipal && user?.role === "teacher" ? (user?.groupName ?? undefined) : undefined}
       />
 
       {/* Modal تأكيد الحذف */}
-      <AnimatePresence>
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        size="sm"
+      >
         {deleteTarget && (
-          <>
-            <motion.div
-              key="del-bg"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
-              onClick={() => setDeleteTarget(null)}
-            />
-            <motion.div
-              key="del-modal"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            >
-              <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center">
-                <div className="w-14 h-14 rounded-2xl bg-red-100 flex items-center justify-center mx-auto mb-5">
-                  <Trash2 className="w-7 h-7 text-red-500" />
-                </div>
-                <h3 className="text-xl font-black text-gray-900 mb-2" style={{ fontFamily: "var(--font-headline)" }}>
-                  حذف الطالب؟
-                </h3>
-                <p className="text-gray-500 text-sm mb-6 leading-relaxed">
-                  سيتم تحويل حالة الطالب <strong className="text-gray-800">{deleteTarget.fullName}</strong> إلى "محذوف". يمكن استعادته لاحقاً.
-                </p>
-                <div className="flex gap-3">
-                  <button onClick={() => setDeleteTarget(null)} className="btn-secondary flex-1 justify-center py-2.5">
-                    إلغاء
-                  </button>
-                  <button onClick={confirmDelete} className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold transition-colors flex items-center justify-center gap-2">
-                    <Trash2 className="w-4 h-4" />
-                    نعم، احذف
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </>
+          <div className="p-8 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-red-100 flex items-center justify-center mx-auto mb-5">
+              <Trash2 className="w-7 h-7 text-red-500" />
+            </div>
+            <h3 className="text-xl font-black text-gray-900 mb-2" style={{ fontFamily: "var(--font-headline)" }}>
+              حذف الطالب؟
+            </h3>
+            <p className="text-gray-500 text-sm mb-6 leading-relaxed">
+              سيتم تحويل حالة الطالب <strong className="text-gray-800">{deleteTarget.fullName}</strong> إلى "محذوف". يمكن استعادته لاحقاً.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteTarget(null)} className="btn-secondary flex-1 justify-center py-2.5">
+                إلغاء
+              </button>
+              <button onClick={confirmDelete} className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold transition-colors flex items-center justify-center gap-2">
+                <Trash2 className="w-4 h-4" />
+                نعم، احذف
+              </button>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </Modal>
+
+      {/* Modal نقل الطالب */}
+      {transferTarget && school && (
+        <TransferModal
+          student={transferTarget}
+          schoolId={school.id}
+          open={!!transferTarget}
+          onClose={() => setTransferTarget(null)}
+          onTransfer={handleTransfer}
+        />
+      )}
+
+      {/* Modal سيرة الطالب */}
+      {timelineTarget && (
+        <StudentTimelineModal
+          student={timelineTarget}
+          open={!!timelineTarget}
+          onClose={() => setTimelineTarget(null)}
+        />
+      )}
     </div>
   );
 }

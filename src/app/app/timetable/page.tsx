@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Modal, { ModalSection } from "@/components/ui/Modal";
 import { useAuth } from "@/context/AuthContext";
 import { getDB } from "@/lib/storage/db";
 import type { TimetableEntry, DayOfWeek, AppUser } from "@/lib/types";
@@ -88,101 +89,89 @@ function EntryModal({
     onClose();
   };
 
+  const footer = (
+    <div className="flex gap-3 w-full">
+      <button onClick={onClose} className="btn-secondary flex-1 py-2.5 justify-center text-sm">إلغاء</button>
+      <button onClick={handleSave} disabled={saving || !form.groupName}
+        className="btn-primary flex-1 py-2.5 justify-center text-sm">
+        {saving ? <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" /> : <Calendar className="w-4 h-4 flex-shrink-0" />}
+        حفظ الحصة
+      </button>
+    </div>
+  );
+
   return (
-    <AnimatePresence>
-      <motion.div key="backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <motion.div key="modal" initial={{ opacity: 0, y: 20, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 20 }} className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-[#1a1d2a] rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between p-5 bg-gradient-to-l from-[#1e3a8a] to-[#1e40af] text-white">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
-                <Calendar className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-black text-sm">{form.id ? "تعديل حصة" : "إضافة حصة"}</h3>
-                <p className="text-xs text-white/70">جدول الأسبوعي</p>
-              </div>
-            </div>
-            <button onClick={onClose} className="w-8 h-8 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+    <Modal
+      open={true}
+      onClose={onClose}
+      size="md"
+      title={form.id ? "تعديل حصة" : "إضافة حصة"}
+      description="جدول الأسبوعي"
+      icon={<div className="w-10 h-10 rounded-2xl bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400"><Calendar className="w-5 h-5" /></div>}
+      footer={footer}
+    >
+      <div className="p-6 space-y-5">
+        {/* الفوج */}
+        <div>
+          <label className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">الفوج</label>
+          <select value={form.groupName} onChange={e => setForm(f => ({ ...f, groupName: e.target.value }))}
+            className="input-field text-sm w-full">
+            {groups.map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </div>
 
-          <div className="p-5 space-y-4">
-            {/* الفوج */}
-            <div>
-              <label className="label-xs mb-1.5 block">الفوج</label>
-              <select value={form.groupName} onChange={e => setForm(f => ({ ...f, groupName: e.target.value }))}
-                className="input-field text-sm py-2.5 w-full">
-                {groups.map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
-            </div>
-
-            {/* اليوم */}
-            <div>
-              <label className="label-xs mb-1.5 block">اليوم</label>
-              <div className="grid grid-cols-4 gap-1.5">
-                {DAYS.map(d => (
-                  <button key={d} onClick={() => setForm(f => ({ ...f, dayOfWeek: d }))}
-                    className={`py-2 rounded-xl text-xs font-bold border transition-all ${form.dayOfWeek === d
-                      ? "bg-[#1e3a8a] text-white border-[#1e3a8a]"
-                      : "bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:border-[#1e3a8a]/40"}`}>
-                    {d}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* الوقت */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label-xs mb-1.5 block">من</label>
-                <input type="time" value={form.startTime} onChange={e => setForm(f => ({ ...f, startTime: e.target.value }))}
-                  className="input-field text-sm py-2.5 w-full" dir="ltr" />
-              </div>
-              <div>
-                <label className="label-xs mb-1.5 block">إلى</label>
-                <input type="time" value={form.endTime} onChange={e => setForm(f => ({ ...f, endTime: e.target.value }))}
-                  className="input-field text-sm py-2.5 w-full" dir="ltr" />
-              </div>
-            </div>
-
-            {/* المادة والألوان */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label-xs mb-1.5 block">نوع النشاط</label>
-                <select value={form.subject ?? ""} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))}
-                  className="input-field text-sm py-2.5 w-full">
-                  {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="label-xs mb-1.5 block">اللون</label>
-                <div className="flex gap-1.5 flex-wrap">
-                  {COLORS.map(c => (
-                    <button key={c.value} onClick={() => setForm(f => ({ ...f, color: c.value }))}
-                      title={c.label}
-                      style={{ background: c.value }}
-                      className={`w-7 h-7 rounded-lg transition-transform hover:scale-110 ${form.color === c.value ? "ring-2 ring-offset-2 ring-gray-400 scale-110" : ""}`} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-3 px-5 pb-5">
-            <button onClick={onClose} className="btn-secondary flex-1 py-2.5 justify-center text-sm">إلغاء</button>
-            <button onClick={handleSave} disabled={saving || !form.groupName}
-              className="flex-1 py-2.5 justify-center text-sm flex items-center gap-2 rounded-xl font-bold text-white bg-gradient-to-l from-[#1e3a8a] to-[#1e40af] hover:opacity-90 disabled:opacity-40 transition-opacity">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Calendar className="w-4 h-4" /> حفظ الحصة</>}
-            </button>
+        {/* اليوم */}
+        <div>
+          <label className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">اليوم</label>
+          <div className="grid grid-cols-4 gap-1.5">
+            {DAYS.map(d => (
+              <button key={d} onClick={() => setForm(f => ({ ...f, dayOfWeek: d }))}
+                className={`py-2 rounded-xl text-xs font-bold border transition-all ${form.dayOfWeek === d
+                  ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm"
+                  : "bg-white dark:bg-[var(--color-card)] text-gray-600 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:border-[var(--color-primary)]/40"}`}>
+                {d}
+              </button>
+            ))}
           </div>
         </div>
-      </motion.div>
-    </AnimatePresence>
+
+        {/* الوقت */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">من</label>
+            <input type="time" value={form.startTime} onChange={e => setForm(f => ({ ...f, startTime: e.target.value }))}
+              className="input-field text-sm w-full" dir="ltr" />
+          </div>
+          <div>
+            <label className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">إلى</label>
+            <input type="time" value={form.endTime} onChange={e => setForm(f => ({ ...f, endTime: e.target.value }))}
+              className="input-field text-sm w-full" dir="ltr" />
+          </div>
+        </div>
+
+        {/* المادة والألوان */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">نوع النشاط</label>
+            <select value={form.subject ?? ""} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))}
+              className="input-field text-sm w-full">
+              {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">اللون</label>
+            <div className="flex gap-1.5 flex-wrap pt-1">
+              {COLORS.map(c => (
+                <button key={c.value} onClick={() => setForm(f => ({ ...f, color: c.value }))}
+                  title={c.label}
+                  style={{ background: c.value }}
+                  className={`w-7 h-7 rounded-lg transition-transform hover:scale-110 ${form.color === c.value ? "ring-2 ring-offset-2 ring-gray-400 scale-110" : ""}`} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

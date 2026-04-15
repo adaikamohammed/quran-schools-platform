@@ -12,6 +12,7 @@ import {
   Search, Edit, Trash2, ChevronRight, UtensilsCrossed,
 } from "lucide-react";
 import { v4 as uuid } from "uuid";
+import LivePresence from "@/components/ui/LivePresence";
 
 // ─── Modal اجتماع جديد ───────────────────────────────────
 
@@ -487,9 +488,19 @@ function MeetingsPage() {
           <h1 className="text-2xl font-black text-gray-900" style={{ fontFamily: "var(--font-headline)" }}>نظام الاجتماعات والمناسبات</h1>
           <p className="text-xs text-gray-400 mt-0.5">جدولة وتنظيم نشاطات وأحداث المدرسة وإصدار التقارير للمشايخ</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn-primary py-2.5 text-sm shrink-0 whitespace-nowrap">
-          <Plus className="w-4 h-4" /> {activeTab === 'meeting' ? 'اجتماع جديد' : 'مناسبة جديدة'}
-        </button>
+        <div className="flex items-center gap-3 w-full sm:w-auto mt-2 sm:mt-0">
+          {school && <LivePresence roomId={`meetings_${school.id}`} isTyping={showModal} />}
+          <button onClick={() => setShowModal(true)} className="btn-primary py-2.5 text-sm shrink-0 whitespace-nowrap hidden sm:flex">
+            <Plus className="w-4 h-4" /> {activeTab === 'meeting' ? 'اجتماع جديد' : 'مناسبة جديدة'}
+          </button>
+        </div>
+      </div>
+      
+      {/* Mobile add button (since we hid it in header for mobile) */}
+      <div className="sm:hidden w-full">
+         <button onClick={() => setShowModal(true)} className="btn-primary w-full py-2.5 text-sm justify-center">
+            <Plus className="w-4 h-4" /> {activeTab === 'meeting' ? 'اجتماع جديد' : 'مناسبة جديدة'}
+         </button>
       </div>
 
       {/* Tabs Layout */}

@@ -8,9 +8,24 @@ const supabase = createServiceClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+function snakeToCamel(str: string) {
+  return str.replace(/([-_][a-z])/ig, ($1) => $1.toUpperCase().replace('_', ''));
+}
+
+function convertKeysToCamel(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map((v) => convertKeysToCamel(v));
+  } else if (obj !== null && obj.constructor === Object) {
+    return Object.keys(obj).reduce((acc, key) => {
+      acc[snakeToCamel(key)] = convertKeysToCamel(obj[key]);
+      return acc;
+    }, {} as any);
+  }
+  return obj;
+}
+
 export async function GET(req: Request) {
   try {
-    // استخدام Supabase Auth (نفس الجلسة التي تُنشئها صفحة تسجيل الدخول)
     const authClient = await createClient();
     const { data: { user }, error: authError } = await authClient.auth.getUser();
 
@@ -18,7 +33,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // جلب school_id من جدول المستخدمين
     const { data: userData } = await supabase
       .from("users")
       .select("school_id")
@@ -42,29 +56,42 @@ export async function GET(req: Request) {
       .select("*")
       .eq("school_id", schoolId)
       .gt("updated_at", lastSyncAt);
-    students?.forEach((s) =>
-      changes.push({ table: "students", recordId: s.id, data: s, deletedAt: s.deleted_at })
-    );
+      
+    students?.forEach((s) => {
+      const camelS = convertKeysToCamel(s);
+      changes.push({ table: "students", recordId: s.id, data: camelS, deletedAt: s.deleted_at })
+    });
 
     // 2. الحصص اليومية
     const { data: sessions } = await supabase
       .from("daily_sessions")
-      .select("*, session_records(*)")
+      .select("*, daily_records(*)")
       .eq("school_id", schoolId)
       .gt("updated_at", lastSyncAt);
-    sessions?.forEach((s) =>
-      changes.push({ table: "sessions", recordId: s.id, data: s, deletedAt: s.deleted_at })
-    );
+      
+    sessions?.forEach((s) => {
+      const camelS = convertKeysToCamel(s);
+      // Map dailyRecords to records
+      if (camelS.dailyRecords) {
+        camelS.records = camelS.dailyRecords;
+        delete camelS.dailyRecords;
+      } else {
+        camelS.records = [];
+      }
+      changes.push({ table: "sessions", recordId: s.id, data: camelS, deletedAt: s.deleted_at })
+    });
 
     // 3. تقدم السور
     const { data: progress } = await supabase
-      .from("surah_progress")
+      .from("surah_progresses")
       .select("*")
       .eq("school_id", schoolId)
       .gt("updated_at", lastSyncAt);
-    progress?.forEach((p) =>
-      changes.push({ table: "surahProgress", recordId: p.id, data: p, deletedAt: p.deleted_at })
-    );
+      
+    progress?.forEach((p) => {
+      const camelS = convertKeysToCamel(p);
+      changes.push({ table: "surahProgress", recordId: p.id, data: camelS, deletedAt: p.deleted_at })
+    });
 
     // 4. المدفوعات
     const { data: payments } = await supabase
@@ -72,19 +99,23 @@ export async function GET(req: Request) {
       .select("*")
       .eq("school_id", schoolId)
       .gt("updated_at", lastSyncAt);
-    payments?.forEach((p) =>
-      changes.push({ table: "payments", recordId: p.id, data: p, deletedAt: p.deleted_at })
-    );
+      
+    payments?.forEach((p) => {
+      const camelS = convertKeysToCamel(p);
+      changes.push({ table: "payments", recordId: p.id, data: camelS, deletedAt: p.deleted_at })
+    });
 
     // 5. المستخدمون (بدون password_hash)
     const { data: users } = await supabase
       .from("users")
-      .select("id, email, display_name, role, school_id, created_at, updated_at, deleted_at")
+      .select("id, email, display_name, role, school_id, group_name, gender, join_date, is_active, created_at, updated_at, deleted_at")
       .eq("school_id", schoolId)
       .gt("updated_at", lastSyncAt);
-    users?.forEach((u) =>
-      changes.push({ table: "users", recordId: u.id, data: u, deletedAt: u.deleted_at })
-    );
+      
+    users?.forEach((u) => {
+      const camelS = convertKeysToCamel(u);
+      changes.push({ table: "users", recordId: u.id, data: camelS, deletedAt: u.deleted_at })
+    });
 
     return NextResponse.json({ success: true, changes });
   } catch (error) {
