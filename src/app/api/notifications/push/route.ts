@@ -1,12 +1,21 @@
 import webpush from "web-push";
 import { NextRequest, NextResponse } from "next/server";
 
+const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
+const privateKey = process.env.VAPID_PRIVATE_KEY || "";
+
 // ─── إعداد مفاتيح VAPID ─────────────────────────────────
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT || "mailto:admin@example.com",
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "",
-  process.env.VAPID_PRIVATE_KEY || ""
-);
+if (publicKey && privateKey) {
+  try {
+    webpush.setVapidDetails(
+      process.env.VAPID_SUBJECT || "mailto:admin@example.com",
+      publicKey,
+      privateKey
+    );
+  } catch (err) {
+    console.warn("Failed to set VAPID details:", err);
+  }
+}
 
 export interface PushSubscriptionRecord {
   endpoint: string;
@@ -40,6 +49,11 @@ export async function POST(req: NextRequest) {
 
     if (!subscriptions || subscriptions.length === 0) {
       return NextResponse.json({ error: "لا توجد اشتراكات مسجلة" }, { status: 400 });
+    }
+
+    if (!publicKey || !privateKey) {
+      console.warn("VAPID keys not configured, skipping push notification.");
+      return NextResponse.json({ error: "VAPID keys not configured" }, { status: 500 });
     }
 
     const notificationPayload = JSON.stringify({
