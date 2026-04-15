@@ -601,7 +601,7 @@ function SessionsPage() {
       const old = prev.find((r) => r.studentId === studentId);
       
       if (patch.attendance && patch.attendance !== old?.attendance) {
-        if (["حاضر", "متأخر", "تعويض"].includes(patch.attendance) && (!old?.attendance || old?.attendance === "غائب" || old?.attendance === "")) {
+        if (["حاضر", "متأخر", "تعويض"].includes(patch.attendance) && (!old?.attendance || old?.attendance === "غائب")) {
           setTimeout(async () => {
             const db = getDB();
             const allSessions = await db.sessions.where("teacherId").equals(selectedTeacherId).toArray();
