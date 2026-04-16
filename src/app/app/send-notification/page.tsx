@@ -112,7 +112,7 @@ function SendNotificationPage() {
         const users = await db.users
           .where("schoolId")
           .equals(school.id)
-          .and((u) => u.role !== "student" && u.id !== user.id) // exclude self
+          .and((u) => (u.role as string) !== "student" && u.id !== user.id) // exclude self
           .toArray();
         setTargets(
           users.map((u) => ({
