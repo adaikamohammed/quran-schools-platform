@@ -3,6 +3,7 @@ import SchoolGuard from "@/components/layout/SchoolGuard";
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getDB } from "@/lib/storage/db";
+import { createClient } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Bell, AlertTriangle, Clock, UserX, CreditCard,
@@ -216,31 +217,41 @@ function NotificationsPage() {
       }
     } catch {}
 
-    // ── 6. إشعارات النظام (الخاصة بمدير الموقع أو مدير المدرسة) ──
+    // ── 6. إشعارات النظام — جلب مباشر من Supabase لضمان الوصول الفوري ──
     try {
-      const allSystemNotifs = await db.systemNotifications.toArray();
-      for (const n of allSystemNotifs) {
-        if (
-          n.targetType === "all" ||
-          (user && n.targetIds?.includes(user.id)) ||
-          (school && n.targetIds?.includes(school.id))
-        ) {
-          // استخلاص النص المجرد من رسالة HTML كعينة وصف
-          let plainText = n.message.replace(/<[^>]+>/g, " ");
-          if (plainText.length > 100) plainText = plainText.substring(0, 100) + "...";
+      const supabase = createClient();
+      const { data: systemNotifs, error: notifErr } = await supabase
+        .from("system_notifications")
+        .select("*")
+        .or(`school_id.eq.${school.id},school_id.is.null`)
+        .order("created_at", { ascending: false });
 
-          generated.push({
-            id: `sys-${n.id}`,
-            type: "system_notification",
-            severity: n.type === "default" ? "info" : (n.type as AlertSeverity),
-            title: n.title,
-            description: plainText,
-            imageUrl: n.imageUrl,
-            entityId: n.id,
-            createdAt: n.createdAt,
-            isRead: false,
-            // You can optionally pass n.message if you want to display the full rich text on click
-          });
+      if (!notifErr && systemNotifs) {
+        for (const n of systemNotifs) {
+          const targetType: string = n.target_type;
+          const targetIds: string[] = Array.isArray(n.target_ids) ? n.target_ids : [];
+
+          // عرض الإشعار إذا كان للجميع أو يشمل هذا المستخدم أو هذه المدرسة
+          if (
+            targetType === "all" ||
+            (user?.id && targetIds.includes(user.id)) ||
+            (school?.id && targetIds.includes(school.id))
+          ) {
+            let plainText = (n.message || "").replace(/<[^>]+>/g, " ").trim();
+            if (plainText.length > 100) plainText = plainText.substring(0, 100) + "...";
+
+            generated.push({
+              id: `sys-${n.id}`,
+              type: "system_notification",
+              severity: n.type === "default" ? "info" : (n.type as AlertSeverity),
+              title: n.title,
+              description: plainText || "لا يوجد وصف",
+              imageUrl: n.image_url ?? undefined,
+              entityId: n.id,
+              createdAt: n.created_at,
+              isRead: false,
+            });
+          }
         }
       }
     } catch {}

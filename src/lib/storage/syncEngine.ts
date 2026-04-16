@@ -142,22 +142,22 @@ export async function pullSync(): Promise<void> {
     if (!data.changes || data.changes.length === 0) return;
 
     const db = getDB();
-    
-    // Applying pulled changes correctly
-    await db.transaction("rw", db.students, db.sessions, db.users, db.surahProgress, db.payments, db.systemNotifications, async () => {
-      for (const change of data.changes) {
+
+    // Applying pulled changes individually (no transaction to avoid table-scope issues)
+    for (const change of data.changes) {
+      try {
         const table = db[change.table as keyof typeof db] as any;
-        if (!table) continue;
+        if (!table || typeof table.put !== "function") continue;
 
         if (change.deletedAt) {
-          // It's a soft delete, remove it locally
           await table.delete(change.recordId);
         } else {
-          // Upsert the record locally
           await table.put(change.data);
         }
+      } catch (tableErr) {
+        console.warn(`[PullSync] Could not save change for table "${change.table}":`, tableErr);
       }
-    });
+    }
 
     notify({ lastSyncAt: new Date().toISOString() });
   } catch (err) {

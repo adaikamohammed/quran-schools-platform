@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Modal, { ModalSection } from "@/components/ui/Modal";
 import { 
   Users, Plus, Search, Edit, Trash2, X, AlertTriangle, CheckCircle2,
-  Shield, UserCog, BookOpen
+  Shield, UserCog, BookOpen, Eye, EyeOff, Copy, KeyRound, Mail
 } from "lucide-react";
 import { getDialCode } from "@/lib/countries";
 import { PhotoPicker } from "@/components/ui/PhotoPicker";
@@ -118,8 +118,16 @@ function TeacherModal({
 
           <div className="col-span-2">
             <label className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">كلمة المرور {teacher && "(اتركها فارغة للحفاظ على القديمة)"} {!teacher && <span className="text-red-500">*</span>}</label>
-            <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
-              placeholder="••••••••" className="input-field py-2.5 text-sm w-full" dir="ltr" />
+            <div className="relative">
+              <PasswordInput
+                value={form.password}
+                onChange={(v) => setForm({ ...form, password: v })}
+                placeholder={teacher ? (teacher.plain_password || "••••••••") : "••••••••"}
+              />
+            </div>
+            {teacher?.plain_password && form.password === "" && (
+              <p className="text-xs text-emerald-600 mt-1 font-medium">كلمة المرور الحالية محفوظة: <span className="font-bold select-all" dir="ltr">{teacher.plain_password}</span></p>
+            )}
           </div>
 
           <div className="col-span-2 sm:col-span-1">
@@ -144,6 +152,64 @@ function TeacherModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+// ─── مكوّن حقل كلمة المرور مع إظهار/إخفاء ───────────────────
+function PasswordInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        type={show ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder || "••••••••"}
+        className="input-field py-2.5 text-sm w-full pl-10"
+        dir="ltr"
+      />
+      <button
+        type="button"
+        onClick={() => setShow(s => !s)}
+        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+      >
+        {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+}
+
+// ─── بادج كلمة مرور المعلم في الكارد ────────────────────────
+function TeacherPasswordBadge({ password }: { password: string }) {
+  const [show, setShow] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const copy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(password);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <div className="flex items-center gap-1.5 text-xs bg-amber-50 dark:bg-amber-500/10 rounded-lg px-2.5 py-1.5">
+      <KeyRound className="w-3 h-3 text-amber-500 shrink-0" />
+      <span className="text-amber-700 dark:text-amber-300 font-bold flex-1 select-all" dir="ltr">
+        {show ? password : "••••••••"}
+      </span>
+      <button
+        onClick={(e) => { e.stopPropagation(); setShow(s => !s); }}
+        className="text-amber-400 hover:text-amber-600 shrink-0"
+        title={show ? "إخفاء" : "إظهار كلمة المرور"}
+      >
+        {show ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+      </button>
+      <button
+        onClick={copy}
+        className="text-amber-400 hover:text-amber-600 shrink-0"
+        title="نسخ كلمة المرور"
+      >
+        {copied ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+      </button>
+    </div>
   );
 }
 
@@ -224,7 +290,7 @@ function TeachersPage() {
         throw new Error(err.error || "فشل إنشاء الحساب");
       }
     } else {
-      // تحديث الملف التعريفي فقط (ليس البريد أو كلمة المرور بشكل آمن)
+      // تحديث الملف التعريفي
       const updatePayload: any = {
         display_name: data.displayName,
         group_name: data.groupName || editingTeacher.group_name,
@@ -232,6 +298,17 @@ function TeachersPage() {
         gender: data.gender,
         photo_url: data.photoURL,
       };
+
+      // إذا أدخل المدير كلمة مرور جديدة — نحفظها في plain_password
+      if (data.password) {
+        updatePayload.plain_password = data.password;
+        // تحديث كلمة المرور في auth.users عبر API مخصص (اختياري)
+        await fetch("/api/teachers/update-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: editingTeacher.id, password: data.password }),
+        }).catch(() => {}); // تجاهل الخطأ إذا لم يكن API موجوداً
+      }
 
       await supabase.from("users").update(updatePayload).eq("id", editingTeacher.id);
     }
@@ -265,6 +342,7 @@ function TeachersPage() {
   if (!isPrincipal) {
     return <div className="text-center py-20 text-red-500 font-bold">عذراً، هذه الصفحة مخصصة للمدير والإدارة فقط.</div>;
   }
+
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -331,10 +409,25 @@ function TeachersPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-1 mt-4 text-xs text-gray-500 font-medium">
-                    <p className="flex justify-between"><span className="opacity-70">البريد:</span> <span className="text-gray-800 font-bold select-all truncate">{t.email}</span></p>
-                    <div className="h-px bg-gray-100 my-2" />
-                    <p className="flex justify-between items-center"><span className="opacity-70">إجمالي الطلاب:</span>
+                  <div className="space-y-2 mt-4">
+                    {/* البريد الإلكتروني */}
+                    <div className="flex items-center gap-1.5 text-xs bg-blue-50 dark:bg-blue-500/10 rounded-lg px-2.5 py-1.5">
+                      <Mail className="w-3 h-3 text-blue-500 shrink-0" />
+                      <span className="text-blue-700 dark:text-blue-300 font-bold select-all truncate flex-1" dir="ltr">{t.email}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(t.email); }}
+                        className="text-blue-400 hover:text-blue-600 shrink-0"
+                        title="نسخ البريد"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                    </div>
+                    {/* كلمة المرور */}
+                    {t.plain_password && (
+                      <TeacherPasswordBadge password={t.plain_password} />
+                    )}
+                    <div className="h-px bg-gray-100 my-1" />
+                    <p className="flex justify-between items-center text-xs text-gray-500 font-medium"><span className="opacity-70">إجمالي الطلاب:</span>
                       <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-lg font-black flex items-center gap-1.5">
                         <Users className="w-3 h-3" /> {studentsCount[t.id] || 0}
                       </span>

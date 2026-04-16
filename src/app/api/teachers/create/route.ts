@@ -67,7 +67,8 @@ export async function POST(request: Request) {
         phone: phone || '',
         gender: gender || 'ذكر',
         photo_url: photoURL || null,
-        is_active: true
+        is_active: true,
+        plain_password: password, // مرئية لمدير المدرسة فقط
       })
       .select()
       .single();
