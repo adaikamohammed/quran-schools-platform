@@ -57,6 +57,13 @@ export async function GET() {
 
     if (studentErr) console.warn("studentCount error:", studentErr.message);
 
+    // ── 3.5 عدد المجموعات / الأفواج ──────────────────────────────────────────
+    const { count: groupCount, error: groupErr } = await admin
+      .from("groups")
+      .select("*", { count: "exact", head: true });
+      
+    if (groupErr) console.warn("groupCount error:", groupErr.message);
+
     // ── 4. إحصاء لكل مدرسة (أحدث 6) ─────────────────────────────────────────
     const recentSchoolIds = (schools ?? []).slice(0, 6).map((s) => s.id);
 
@@ -115,6 +122,7 @@ export async function GET() {
       pendingRequests: 0,            // جدول school_requests غير موجود حالياً
       totalTeachers: teacherCount ?? 0,
       totalStudents: studentCount ?? 0,
+      totalGroups: groupCount ?? 0,
       recentSchools,
     });
   } catch (err: any) {

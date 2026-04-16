@@ -39,6 +39,7 @@ import {
   FolderOpen,
   Bell,
   Layers,
+  Megaphone,
 } from "lucide-react";
 
 // ─── تعريف التنقل ──────────────────────────────────────────
@@ -105,6 +106,7 @@ const SCHOOL_NAV_GROUPS: NavGroup[] = [
       { href: "/app/documents",         label: "مركز الوثائق",        icon: FolderOpen,  featureKey: "documents" },
       { href: "/app/certificates",      label: "نظام الشهادات",        icon: Award,       featureKey: "certificates", badge: "جديد" },
       { href: "/app/logs",              label: "سجل النشاطات",        icon: ScrollText,  featureKey: "logs" },
+      { href: "/app/send-notification", label: "إرسال إشعارات",       icon: Megaphone,   featureKey: "send_notification" },
     ],
   },
   {
@@ -131,6 +133,7 @@ const PLATFORM_NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/app/schools-admin", label: "المدارس المسجلة", icon: Building2 },
       { href: "/app/school-requests", label: "طلبات التسجيل", icon: ClipboardList, badge: "جديد" },
+      { href: "/app/send-notification", label: "إرسال إشعارات", icon: Megaphone },
     ],
   },
   {

@@ -391,7 +391,8 @@ export type SyncTable =
   | 'registrations'
   | 'reports'
   | 'meetings'
-  | 'users';
+  | 'users'
+  | 'system_notifications';
 
 export interface SyncQueueItem {
   id: string;
@@ -412,6 +413,26 @@ export interface Surah {
   id: number;
   name: string;
   verses: number;
+}
+
+// ─── إشعارات النظام المخصصة ──────────────────────────────────────────
+
+export type SystemNotificationType = 'default' | 'info' | 'warning' | 'critical';
+export type SystemNotificationTarget = 'all' | 'specific';
+
+export interface SystemNotification {
+  id: string;
+  schoolId: string | null;           // null if sent by super_admin
+  senderId: string;
+  senderName: string;
+  type: SystemNotificationType;
+  title: string;
+  message: string;                   // HTML content
+  imageUrl?: string;                 // Base64 or URL
+  targetType: SystemNotificationTarget;
+  targetIds: string[];               // Array of user IDs or school IDs if specific
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── سجل النشاطات (Audit Log) ───────────────────────────

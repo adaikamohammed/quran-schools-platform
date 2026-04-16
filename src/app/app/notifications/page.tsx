@@ -6,7 +6,7 @@ import { getDB } from "@/lib/storage/db";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Bell, AlertTriangle, Clock, UserX, CreditCard,
-  UserPlus, CheckCircle2, RefreshCw, X, Filter,
+  UserPlus, CheckCircle2, RefreshCw, X, Filter, Megaphone
 } from "lucide-react";
 
 // ─── أنواع التنبيهات ──────────────────────────────────────
@@ -15,11 +15,12 @@ type AlertSeverity = "critical" | "warning" | "info";
 
 interface AppAlert {
   id: string;
-  type: "absent_student" | "overdue_payment" | "pending_registration" | "inactive_teacher" | "upcoming_meeting";
+  type: "absent_student" | "overdue_payment" | "pending_registration" | "inactive_teacher" | "upcoming_meeting" | "system_notification";
   severity: AlertSeverity;
   title: string;
   description: string;
   entityId?: string;
+  imageUrl?: string;
   createdAt: string;
   isRead: boolean;
 }
@@ -36,6 +37,7 @@ const TYPE_ICON = {
   pending_registration:{ icon: UserPlus,    color: "text-blue-500",  bg: "bg-blue-100" },
   inactive_teacher:    { icon: AlertTriangle, color: "text-orange-500", bg: "bg-orange-100" },
   upcoming_meeting:    { icon: Bell,        color: "text-indigo-500", bg: "bg-indigo-100" },
+  system_notification: { icon: Megaphone,   color: "text-pink-500",   bg: "bg-pink-100" },
 };
 
 // ─── الصفحة الرئيسية ──────────────────────────────────────
@@ -214,6 +216,35 @@ function NotificationsPage() {
       }
     } catch {}
 
+    // ── 6. إشعارات النظام (الخاصة بمدير الموقع أو مدير المدرسة) ──
+    try {
+      const allSystemNotifs = await db.systemNotifications.toArray();
+      for (const n of allSystemNotifs) {
+        if (
+          n.targetType === "all" ||
+          (user && n.targetIds.includes(user.id)) ||
+          (school && n.targetIds.includes(school.id))
+        ) {
+          // استخلاص النص المجرد من رسالة HTML كعينة وصف
+          let plainText = n.message.replace(/<[^>]+>/g, " ");
+          if (plainText.length > 100) plainText = plainText.substring(0, 100) + "...";
+
+          generated.push({
+            id: `sys-${n.id}`,
+            type: "system_notification",
+            severity: n.type === "default" ? "info" : (n.type as AlertSeverity),
+            title: n.title,
+            description: plainText,
+            imageUrl: n.imageUrl,
+            entityId: n.id,
+            createdAt: n.createdAt,
+            isRead: false,
+            // You can optionally pass n.message if you want to display the full rich text on click
+          });
+        }
+      }
+    } catch {}
+
     // ترتيب: الحرج أولاً
     const sortOrder: Record<AlertSeverity, number> = { critical: 0, warning: 1, info: 2 };
     generated.sort((a, b) => sortOrder[a.severity] - sortOrder[b.severity]);
@@ -338,6 +369,11 @@ function NotificationsPage() {
                         {sev.label}
                       </span>
                     </div>
+                    {alert.type === "system_notification" && alert.imageUrl && (
+                      <div className="my-2">
+                        <img src={alert.imageUrl} alt="مرفق" className="max-w-[200px] h-auto object-cover rounded-xl border border-gray-100 shadow-sm" />
+                      </div>
+                    )}
                     <p className="text-xs text-gray-500 leading-relaxed">{alert.description}</p>
                   </div>
 

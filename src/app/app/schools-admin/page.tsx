@@ -172,29 +172,29 @@ export default function SchoolsAdminPage() {
     if (!isSuperAdmin) return;
     setLoading(true);
     
-    // جلب كل المدارس باستثناء المقر الرئيسي
-    const { data: schoolsData, error } = await supabase
-      .from('schools')
-      .select('*')
-      .neq('name', 'المقر الرئيسي (HQ)');
+    try {
+      const res = await fetch("/api/admin/schools-analytics");
+      if (!res.ok) throw new Error("Failed to fetch schools");
+      const analyticsInfo = await res.json();
       
-    if (error) {
-      console.error(error);
-      setLoading(false);
-      return;
-    }
-
-    const augmented = [];
-    for (const s of (schoolsData || [])) {
-      const { data: principal } = await supabase.from('users').select('*').eq('school_id', s.id).eq('role', 'principal').single();
-      const { count: studentsCount } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('school_id', s.id);
-      const { count: teachersCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('school_id', s.id).eq('role', 'teacher');
-
-      augmented.push({ school: s, principal, stats: { students: studentsCount || 0, teachers: teachersCount || 0 } });
-    }
+      const augmented = analyticsInfo.map((a: any) => ({
+        school: { ...a.school_og_data, country: a.country }, 
+        principal: { display_name: a.principalName, email: a.principalEmail },
+        stats: { 
+          students: a.studentCount, 
+          teachers: a.teacherCount, 
+          groups: a.groupCount, 
+          engagementRate: a.engagementRate, 
+          lastActivity: a.lastActivity,
+          createdAt: a.createdAt
+        }
+      }));
       
-    augmented.sort((a, b) => a.school.name.localeCompare(b.school.name, "ar"));
-    setSchools(augmented);
+      setSchools(augmented);
+    } catch (err) {
+      console.error(err);
+    }
+    
     setLoading(false);
   }, [isSuperAdmin]);
 
@@ -300,7 +300,7 @@ export default function SchoolsAdminPage() {
                       <h3 className="text-base font-black text-gray-900 truncate" title={item.school.name}>
                         {item.school.name}
                       </h3>
-                      <span className="text-xs text-gray-400">{item.school.city}</span>
+                      <span className="text-xs text-gray-400 font-bold">{[item.school.country, item.school.city].filter(Boolean).join(" - ")}</span>
                     </div>
                   </div>
                   
@@ -316,16 +316,29 @@ export default function SchoolsAdminPage() {
                       </p>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-2 mt-3">
+                    <div className="grid grid-cols-4 gap-2 mt-3">
                       <div className="p-2 border border-indigo-50 bg-indigo-50/30 rounded-lg text-center">
-                        <p className="text-[10px] text-gray-400 mb-0.5">الطلاب</p>
-                        <p className="text-sm font-black text-indigo-700">{item.stats.students}</p>
+                        <p className="text-[9px] text-gray-500 mb-0.5">الطلاب</p>
+                        <p className="text-xs font-black text-indigo-700">{item.stats.students}</p>
                       </div>
                       <div className="p-2 border border-blue-50 bg-blue-50/30 rounded-lg text-center">
-                        <p className="text-[10px] text-gray-400 mb-0.5">المعلمين</p>
-                        <p className="text-sm font-black text-blue-700">{item.stats.teachers}</p>
+                        <p className="text-[9px] text-gray-500 mb-0.5">المعلمين</p>
+                        <p className="text-xs font-black text-blue-700">{item.stats.teachers}</p>
+                      </div>
+                      <div className="p-2 border border-purple-50 bg-purple-50/30 rounded-lg text-center">
+                        <p className="text-[9px] text-gray-500 mb-0.5">الأفواج</p>
+                        <p className="text-xs font-black text-purple-700">{item.stats.groups}</p>
+                      </div>
+                      <div className="p-2 border border-emerald-50 bg-emerald-50/30 rounded-lg text-center">
+                        <p className="text-[9px] text-gray-500 mb-0.5">الالتزام</p>
+                        <p className={`text-xs font-black ${item.stats.engagementRate > 50 ? 'text-emerald-700' : 'text-amber-600'}`}>{item.stats.engagementRate}%</p>
                       </div>
                     </div>
+                  </div>
+                  
+                  <div className="mt-3 text-[10px] text-gray-400 flex items-center justify-between px-1">
+                    <span>التسجيل: {item.stats.createdAt ? new Date(item.stats.createdAt).toLocaleDateString('ar-DZ') : '-'}</span>
+                    <span>النشاط: {item.stats.lastActivity ? new Date(item.stats.lastActivity).toLocaleDateString('ar-DZ') : 'لا يوجد'}</span>
                   </div>
                 </div>
 

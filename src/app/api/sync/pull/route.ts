@@ -117,6 +117,18 @@ export async function GET(req: Request) {
       changes.push({ table: "users", recordId: u.id, data: camelS, deletedAt: u.deleted_at })
     });
 
+    // 6. إشعارات النظام
+    const { data: systemNotifs } = await supabase
+      .from("system_notifications")
+      .select("*")
+      .or(`school_id.eq.${schoolId},school_id.is.null`)
+      .gt("updated_at", lastSyncAt);
+
+    systemNotifs?.forEach((n) => {
+      const camelN = convertKeysToCamel(n);
+      changes.push({ table: "systemNotifications", recordId: n.id, data: camelN, deletedAt: n.deleted_at })
+    });
+
     return NextResponse.json({ success: true, changes });
   } catch (error) {
     console.error("Pull sync error:", error);

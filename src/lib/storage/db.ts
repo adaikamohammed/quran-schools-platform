@@ -14,6 +14,7 @@ import type {
   CampItem,
   IssuedDocument,
   TimetableEntry,
+  SystemNotification,
 } from '../types';
 
 // ============================================================
@@ -36,6 +37,7 @@ export class QuranSchoolsDB extends Dexie {
   campItems!: Table<CampItem>;
   issuedDocuments!: Table<IssuedDocument>;
   timetables!: Table<TimetableEntry>;
+  systemNotifications!: Table<SystemNotification>;
 
   constructor() {
     super('QuranSchoolsDB');
@@ -89,6 +91,25 @@ export class QuranSchoolsDB extends Dexie {
       issuedDocuments: 'id, schoolId, issuedBy, documentType, recipientId, issuedAt',
       // جديد:
       timetables: 'id, schoolId, teacherId, groupName, dayOfWeek, createdAt',
+    });
+
+    // الإصدار 4: إضافة جدول إشعارات النظام المخصصة
+    this.version(4).stores({
+      schools: 'id, name, country, createdAt',
+      users: 'id, schoolId, email, role, groupName, isActive',
+      students: 'id, schoolId, teacherId, groupName, fullName, status, gender, subscriptionTier, updatedAt',
+      sessions: 'id, schoolId, teacherId, date, sessionNumber, [teacherId+date]',
+      surahProgress: 'id, studentId, schoolId, surahId, status, updatedAt',
+      payments: 'id, schoolId, studentId, date, status',
+      registrations: 'id, schoolId, status, requestedAt, phone1',
+      reports: 'id, schoolId, teacherId, date, status, isPinned',
+      meetings: 'id, schoolId, status, timestamp',
+      syncQueue: 'id, table, status, createdAt, retries',
+      activityLogs: 'id, schoolId, userId, action, entityType, createdAt',
+      campItems: 'id, schoolId, campYear, category, status, createdAt',
+      issuedDocuments: 'id, schoolId, issuedBy, documentType, recipientId, issuedAt',
+      timetables: 'id, schoolId, teacherId, groupName, dayOfWeek, createdAt',
+      systemNotifications: 'id, schoolId, targetType, createdAt',
     });
   }
 }

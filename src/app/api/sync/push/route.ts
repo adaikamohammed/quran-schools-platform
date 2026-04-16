@@ -15,6 +15,7 @@ const TABLE_MAP: Record<string, string> = {
   surahProgress: "surah_progresses",
   payments: "payments",
   users: "users",
+  systemNotifications: "system_notifications",
 };
 
 function camelToSnake(str: string) {

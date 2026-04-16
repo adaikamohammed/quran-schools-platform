@@ -264,6 +264,22 @@ CREATE TABLE IF NOT EXISTS public.meetings (
   deleted_at    TIMESTAMP WITH TIME ZONE
 );
 
+-- ─── 14. إشعارات النظام ───────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.system_notifications (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  school_id     UUID REFERENCES public.schools(id) ON DELETE CASCADE, -- null if sent by super_admin
+  sender_id     UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  sender_name   TEXT NOT NULL,
+  type          TEXT NOT NULL, -- 'default' | 'info' | 'warning' | 'critical'
+  title         TEXT NOT NULL,
+  message       TEXT NOT NULL,
+  image_url     TEXT,
+  target_type   TEXT NOT NULL, -- 'all' | 'specific'
+  target_ids    JSONB DEFAULT '[]'::jsonb, -- Array of specific user/school IDs
+  created_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- ══════════════════════════════════════════════════════════
 --  Row Level Security
 -- ══════════════════════════════════════════════════════════
@@ -279,6 +295,7 @@ ALTER TABLE public.payments         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pre_registrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.daily_reports    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.meetings         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.system_notifications ENABLE ROW LEVEL SECURITY;
 
 -- السياسات — يسمح للـ service_role بكل شيء (للـ API Routes)
 CREATE POLICY "Service role bypass" ON public.schools
@@ -313,3 +330,15 @@ CREATE POLICY "Service role bypass" ON public.daily_reports
 
 CREATE POLICY "Service role bypass" ON public.meetings
   FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "Service role bypass" ON public.system_notifications
+  FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow Insert for Authenticated" ON public.system_notifications
+  FOR INSERT TO authenticated WITH CHECK (true);
+
+CREATE POLICY "Allow Select for Authenticated" ON public.system_notifications
+  FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Allow Delete for Sender" ON public.system_notifications
+  FOR DELETE TO authenticated USING (sender_id = auth.uid());

@@ -12,6 +12,7 @@ import {
   BookOpen,
   AlertCircle,
 } from "lucide-react";
+import SchoolsRegistrationChart from "../analytics/SchoolsRegistrationChart";
 
 // ─── أنواع ─────────────────────────────────────────────────
 
@@ -20,7 +21,21 @@ interface PlatformStats {
   pendingRequests: number;
   totalTeachers: number;
   totalStudents: number;
+  totalGroups: number;
   recentSchools: RecentSchool[];
+}
+
+interface SchoolAnalytics {
+  id: string;
+  name: string;
+  country: string;
+  city: string;
+  createdAt: string;
+  teacherCount: number;
+  groupCount: number;
+  recentRecordsCount: number;
+  lastActivity: string | null;
+  engagementRate: number;
 }
 
 interface RecentSchool {
@@ -65,19 +80,26 @@ function KpiCard({
 
 export default function SuperAdminDashboard({ displayName }: { displayName?: string }) {
   const [stats, setStats] = useState<PlatformStats | null>(null);
+  const [analytics, setAnalytics] = useState<SchoolAnalytics[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/admin/platform-stats");
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.error ?? `HTTP ${res.status}`);
-        }
-        const data: PlatformStats = await res.json();
+        const [statsRes, analyticsRes] = await Promise.all([
+          fetch("/api/admin/platform-stats"),
+          fetch("/api/admin/schools-analytics")
+        ]);
+
+        if (!statsRes.ok) throw new Error(`HTTP stats ${statsRes.status}`);
+        if (!analyticsRes.ok) throw new Error(`HTTP analytics ${analyticsRes.status}`);
+
+        const data: PlatformStats = await statsRes.json();
+        const analyticsData: SchoolAnalytics[] = await analyticsRes.json();
+
         setStats(data);
+        setAnalytics(analyticsData);
       } catch (e: any) {
         console.error("SuperAdminDashboard:", e?.message ?? e);
         setError(e?.message ?? "تعذّر تحميل البيانات");
@@ -136,7 +158,7 @@ export default function SuperAdminDashboard({ displayName }: { displayName?: str
           <p className="text-red-700 text-sm font-medium">{error}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <KpiCard label="مدرسة مسجلة" value={stats!.totalSchools}
             icon={Building2} color="bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)]"
             href="/app/schools-admin" delay={0} />
@@ -146,6 +168,9 @@ export default function SuperAdminDashboard({ displayName }: { displayName?: str
           <KpiCard label="طلاب في المنصة" value={stats!.totalStudents}
             icon={BookOpen} color="bg-gradient-to-br from-emerald-500 to-emerald-700"
             href="/app/schools-admin" delay={0.16} />
+          <KpiCard label="أفواج وحلقات" value={stats!.totalGroups || 0}
+            icon={Users} color="bg-gradient-to-br from-purple-500 to-purple-700"
+            href="/app/schools-admin" delay={0.20} />
           <KpiCard
             label="طلبات قيد الانتظار"
             value={stats!.pendingRequests}
@@ -208,6 +233,66 @@ export default function SuperAdminDashboard({ displayName }: { displayName?: str
           ))}
         </div>
       </motion.div>
+
+      {/* ── لوحة الأداء والتوزيع الجغرافي ── */}
+      {!loading && !error && analytics && analytics.length > 0 && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* التوزيع الجغرافي */}
+          <div className="bg-white rounded-2xl border border-[var(--color-border)] p-6">
+            <h3 className="text-sm font-black text-gray-800 mb-4 flex items-center gap-2">
+              <Globe className="w-5 h-5 text-[var(--color-primary)]" />
+              أكثر البلدان نشاطاً
+            </h3>
+            <div className="space-y-3">
+              {Object.entries(
+                analytics.reduce((acc, s) => {
+                  acc[s.country] = (acc[s.country] || 0) + 1;
+                  return acc;
+                }, {} as Record<string, number>)
+              ).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([country, count], i) => (
+                <div key={country} className="flex items-center justify-between pb-3 border-b border-gray-50 last:border-0 last:pb-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold shrink-0">{i + 1}</div>
+                    <span className="font-bold text-sm text-gray-700">{country}</span>
+                  </div>
+                  <span className="text-xs font-black bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full">{count} مدرسة</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* أفضل المدارس التزاماً */}
+          <div className="bg-white rounded-2xl border border-[var(--color-border)] p-6">
+            <h3 className="text-sm font-black text-gray-800 mb-4 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-emerald-500" />
+              أعلى المدارس التزاماً (آخر 30 يوم)
+            </h3>
+            <div className="space-y-3">
+              {[...analytics].sort((a, b) => b.engagementRate - a.engagementRate).slice(0, 5).map((school, i) => (
+                <div key={school.id} className="flex items-center justify-between pb-3 border-b border-gray-50 last:border-0 last:pb-0">
+                  <div className="flex-1 min-w-0 pr-2">
+                    <p className="font-bold text-sm text-gray-800 truncate">{school.name}</p>
+                    <p className="text-[10px] text-gray-400">آخر نشاط: {school.lastActivity ? new Date(school.lastActivity).toLocaleDateString('ar-DZ') : 'غير متوفر'}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden shrink-0" dir="ltr">
+                      <div className={`h-full ${school.engagementRate > 70 ? 'bg-emerald-500' : school.engagementRate > 30 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${school.engagementRate}%` }} />
+                    </div>
+                    <span className="text-xs font-black text-gray-600 shrink-0 min-w-8 text-left">{school.engagementRate}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── الرسم البياني لتسجيل المدارس ── */}
+      {!loading && !error && analytics && analytics.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.48 }}>
+          <SchoolsRegistrationChart data={analytics} />
+        </motion.div>
+      )}
 
       {/* ── أحدث المدارس ── */}
       {!loading && !error && stats && stats.recentSchools.length > 0 && (
