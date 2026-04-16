@@ -222,8 +222,8 @@ function NotificationsPage() {
       for (const n of allSystemNotifs) {
         if (
           n.targetType === "all" ||
-          (user && n.targetIds.includes(user.id)) ||
-          (school && n.targetIds.includes(school.id))
+          (user && n.targetIds?.includes(user.id)) ||
+          (school && n.targetIds?.includes(school.id))
         ) {
           // استخلاص النص المجرد من رسالة HTML كعينة وصف
           let plainText = n.message.replace(/<[^>]+>/g, " ");

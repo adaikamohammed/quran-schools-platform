@@ -144,7 +144,7 @@ export async function pullSync(): Promise<void> {
     const db = getDB();
     
     // Applying pulled changes correctly
-    await db.transaction("rw", db.students, db.sessions, db.users, db.systemNotifications, async () => {
+    await db.transaction("rw", db.students, db.sessions, db.users, db.surahProgress, db.payments, db.systemNotifications, async () => {
       for (const change of data.changes) {
         const table = db[change.table as keyof typeof db] as any;
         if (!table) continue;
