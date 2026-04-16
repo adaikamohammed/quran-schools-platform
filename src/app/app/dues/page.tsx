@@ -83,6 +83,7 @@ function StudentPaymentRow({
   payment,
   season,
   schoolName,
+  schoolCountry,
   onToggle,
 }: {
   student: Student;
@@ -149,7 +150,10 @@ function DuesPage() {
   const [filterStatus, setFilterStatus] = useState<PaymentStatus | "الكل">("الكل");
   const [saving, setSaving] = useState<string | null>(null);
 
-  const DEFAULT_PRICE = { "فئة الأكابر": 1500, "فئة الأصاغر": 1200 };
+  // الأسعار: من إعدادات المدرسة مع fallback للقيم الافتراضية
+  const DEFAULT_PRICE: Record<string, number> = (
+    school?.settings?.prices?.renewal as Record<string, number> | undefined
+  ) ?? { "فئة الأكابر": 1500, "فئة الأصاغر": 1200 };
 
   const load = useCallback(async () => {
     if (!user?.id || !school?.id) return;
@@ -314,6 +318,7 @@ function DuesPage() {
               payment={getPayment(student.id)}
               season={season}
               schoolName={school?.name ?? "المدرسة"}
+              schoolCountry={school?.country}
               onToggle={(next) => handleToggle(student, next)}
             />
           ))

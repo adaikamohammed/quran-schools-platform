@@ -12,8 +12,11 @@ const supabase = createServiceClient(
 const TABLE_MAP: Record<string, string> = {
   students: "students",
   sessions: "daily_sessions",
+  surah_progress: "surah_progresses",
   surahProgress: "surah_progresses",
   payments: "payments",
+  registrations: "registrations",
+  reports: "daily_reports",
   users: "users",
   systemNotifications: "system_notifications",
 };

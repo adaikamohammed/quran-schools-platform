@@ -29,6 +29,7 @@ let syncStatus: SyncStatus = {
 
 let syncIntervalId: ReturnType<typeof setInterval> | null = null;
 let isCurrentlySyncing = false;
+let onlineHandler: (() => void) | null = null; // لإزالة listener عند الإيقاف
 
 // ─── الاشتراك في تحديثات الحالة ──────────────────────────
 
@@ -180,11 +181,12 @@ export function startSyncEngine(): void {
     pullSync();
   }, SYNC_INTERVAL);
 
-  // مزامنة عند العودة للإنترنت
-  window.addEventListener('online', () => {
+  // مزامنة عند العودة للإنترنت — named function لإزالتها لاحقاً
+  onlineHandler = () => {
     performSync();
     pullSync();
-  });
+  };
+  window.addEventListener('online', onlineHandler);
 
   console.log('[SyncEngine] بدأ محرك المزامنة — يعمل كل 5 دقائق');
 }
@@ -194,7 +196,11 @@ export function stopSyncEngine(): void {
     clearInterval(syncIntervalId);
     syncIntervalId = null;
   }
-  // Remove event listener (requires named function if we want to remove it properly, but for demo we can ignore or recreate)
+  // إزالة event listener بشكل صحيح
+  if (onlineHandler) {
+    window.removeEventListener('online', onlineHandler);
+    onlineHandler = null;
+  }
   console.log('[SyncEngine] توقّف محرك المزامنة');
 }
 

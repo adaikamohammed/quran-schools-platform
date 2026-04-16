@@ -665,31 +665,37 @@ function SessionsPage() {
 
   const handleSave = async () => {
     if (!user?.id || !school?.id || !selectedTeacherId) return;
+    if (saving) return; // حماية من الحفظ المتكرر
     setSaving(true);
 
     const sessionId = `${selectedTeacherId}-${selectedDate}-${sessionNum}`;
 
-    await createOrUpdateSession({
-      id: sessionId,
-      schoolId: school.id,
-      teacherId: selectedTeacherId,
-      date: selectedDate,
-      sessionNumber: sessionNum,
-      sessionType,
-      surahId,
-      fromVerse,
-      toVerse,
-      teacherAbsenceReason: absenceReason,
-      records: records.filter((r) => r.attendance !== ""),
-    });
+    try {
+      await createOrUpdateSession({
+        id: sessionId,
+        schoolId: school.id,
+        teacherId: selectedTeacherId,
+        date: selectedDate,
+        sessionNumber: sessionNum,
+        sessionType,
+        surahId,
+        fromVerse,
+        toVerse,
+        teacherAbsenceReason: absenceReason,
+        records: records.filter((r) => r.attendance !== ""),
+      });
 
-    setSaved(true);
-    setSaving(false);
+      setSaved(true);
 
-    // تحديث الجلسة المحلية
-    const db = getDB();
-    const updated = await db.sessions.get(sessionId);
-    setSession(updated ?? null);
+      // تحديث الجلسة المحلية
+      const db = getDB();
+      const updated = await db.sessions.get(sessionId);
+      setSession(updated ?? null);
+    } catch (err) {
+      console.error("[Sessions] Failed to save session:", err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleBulkTemporalAttend = async (targetDateStr: string) => {

@@ -77,12 +77,13 @@ async function saveAndQueue<T extends { id: string }>(
 export async function createStudent(
   data: Omit<Student, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<Student> {
+  const now = new Date().toISOString();
   const student: Student = {
     ...data,
     id: uuid(),
     memorizedSurahsCount: data.memorizedSurahsCount ?? 0,
-    createdAt: '',
-    updatedAt: '',
+    createdAt: now,
+    updatedAt: now,
   };
   return saveAndQueue('students', 'create', student, saveStudent);
 }
@@ -141,10 +142,11 @@ export async function createOrUpdateSession(
 ): Promise<DailySession> {
   const existing = await getDB().sessions.get(data.id);
   const action = existing ? 'update' : 'create';
+  const now = new Date().toISOString();
   const session: DailySession = {
     ...data,
-    createdAt: existing?.createdAt ?? '',
-    updatedAt: '',
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
   };
   return saveAndQueue('sessions', action, session, saveSession);
 }
@@ -158,11 +160,12 @@ export async function createOrUpdateSurahProgress(
   const existingId = `${data.studentId}_${data.surahId}`;
   const existing = await getDB().surahProgress.get(existingId);
   const action = existing ? 'update' : 'create';
+  const now = new Date().toISOString();
   const progress: SurahProgress = {
     ...data,
     id: existingId,
-    createdAt: existing?.createdAt ?? '',
-    updatedAt: '',
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
   };
   return saveAndQueue('surah_progress', action, progress, saveSurahProgress);
 }
@@ -175,7 +178,7 @@ export async function createPayment(
   const payment: Payment = {
     ...data,
     id: uuid(),
-    createdAt: '',
+    createdAt: new Date().toISOString(),
   };
   return saveAndQueue('payments', 'create', payment, savePayment);
 }
@@ -195,12 +198,13 @@ export async function updatePaymentStatus(
 export async function createRegistration(
   data: Omit<PreRegistration, 'id' | 'createdAt' | 'updatedAt' | 'requestedAt'>
 ): Promise<PreRegistration> {
+  const now = new Date().toISOString();
   const reg: PreRegistration = {
     ...data,
     id: uuid(),
-    requestedAt: new Date().toISOString(),
-    createdAt: '',
-    updatedAt: '',
+    requestedAt: now,
+    createdAt: now,
+    updatedAt: now,
   };
   return saveAndQueue('registrations', 'create', reg, saveRegistration);
 }
@@ -221,12 +225,13 @@ export async function updateRegistrationStatus(
 export async function createReport(
   data: Omit<DailyReport, 'id' | 'createdAt' | 'updatedAt' | 'timestamp'>
 ): Promise<DailyReport> {
+  const now = new Date().toISOString();
   const report: DailyReport = {
     ...data,
     id: uuid(),
-    timestamp: new Date().toISOString(),
-    createdAt: '',
-    updatedAt: '',
+    timestamp: now,
+    createdAt: now,
+    updatedAt: now,
   };
   return saveAndQueue('reports', 'create', report, saveReport);
 }

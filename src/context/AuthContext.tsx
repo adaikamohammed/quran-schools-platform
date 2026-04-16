@@ -2,8 +2,31 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { startSyncEngine, stopSyncEngine, subscribeSyncStatus, type SyncStatus } from "@/lib/storage/syncEngine";
+import { startSyncEngine, stopSyncEngine, subscribeSyncStatus, pullSync, type SyncStatus } from "@/lib/storage/syncEngine";
 import type { AppUser, School } from "@/lib/types";
+
+// ─── تحويل بيانات المدرسة من Supabase (snake_case) إلى CamelCase ──
+function mapSchool(raw: any): School {
+  return {
+    id: raw.id,
+    name: raw.name ?? "",
+    city: raw.city ?? "",
+    country: raw.country ?? "الجزائر",
+    directorName: raw.director_name ?? "",
+    email: raw.email ?? "",
+    phone: raw.phone ?? "",
+    logoURL: raw.logo_url ?? undefined,
+    seasonStartDate: raw.season_start_date ?? undefined,
+    createdAt: raw.created_at ?? "",
+    updatedAt: raw.updated_at ?? "",
+    settings: raw.settings ?? {
+      prices: { renewal: { 'فئة الأكابر': 1500, 'فئة الأصاغر': 1200 } },
+      points: { attendance: { 'حاضر': 5, 'متأخر': 2, 'تعويض': 3, 'غائب': 0 }, evaluation: { 'ممتاز': 10, 'جيد جداً': 8, 'جيد': 6, 'متوسط': 3, 'لم يحفظ': 0 }, behavior: { 'هادئ': 3, 'متوسط': 1, 'غير منضبط': -1 }, review: { completed: 5 }, surah: { memorized: 15, mastered: 25 }, covenantCompleted: 10 },
+      rewards: [],
+      badges: [],
+    },
+  } as School;
+}
 
 // Types compatible with existing app expectations
 interface AuthContextType {
@@ -67,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .select("*")
               .eq("id", userData.school_id)
               .single();
-            if (mounted) setSchool(schoolData);
+            if (mounted && schoolData) setSchool(mapSchool(schoolData));
           }
         } else {
           if (mounted) setUser(null);
@@ -104,6 +127,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) {
       startSyncEngine();
       const unsub = subscribeSyncStatus((s) => setSyncStatus(s));
+
+      // جلب شامل من Supabase عند أول تسجيل دخول لضمان اكتمال البيانات المحلية
+      pullSync().catch(console.error);
+
       return () => {
         unsub();
         stopSyncEngine();
@@ -135,10 +162,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           displayName: userData.display_name,
           role: userData.role,
           schoolId: userData.school_id,
+          groupName: userData.group_name,
         });
         if (userData.school_id) {
           const { data: schoolData } = await supabase.from("schools").select("*").eq("id", userData.school_id).single();
-          setSchool(schoolData);
+          if (schoolData) setSchool(mapSchool(schoolData));
         }
       }
     }
@@ -157,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: userData } = await supabase.from("users").select("school_id").eq("id", session.user.id).single();
     if (userData?.school_id) {
       const { data: schoolData } = await supabase.from("schools").select("*").eq("id", userData.school_id).single();
-      if (schoolData) setSchool(schoolData);
+      if (schoolData) setSchool(mapSchool(schoolData));
     }
   };
 
