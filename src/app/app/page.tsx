@@ -101,9 +101,27 @@ function SchoolDashboard() {
       });
 
       // ── الطلاب ──
-      const allStudents = (isPrincipal || user?.role === "super_admin")
-        ? await db.students.where("schoolId").equals(school.id).toArray()
-        : await db.students.where("teacherId").equals(user!.id).toArray();
+      let allStudents: any[];
+      if (isPrincipal || user?.role === "super_admin") {
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabaseClient = createClient();
+        const { data: studentsData } = await supabaseClient
+          .from("students")
+          .select("*")
+          .eq("school_id", school.id);
+          
+        allStudents = (studentsData || []).map((s: any) => ({
+          id: s.id,
+          schoolId: s.school_id,
+          teacherId: s.teacher_id,
+          groupName: s.group_name || "",
+          fullName: s.full_name || "",
+          status: s.status,
+          memorizedSurahsCount: s.memorized_surahs_count || 0
+        }));
+      } else {
+        allStudents = await db.students.where("teacherId").equals(user!.id).toArray();
+      }
       setStudents(allStudents);
       const activeSts = allStudents.filter(s => s.status === "نشط");
 

@@ -4,7 +4,9 @@ import SchoolGuard from "@/components/layout/SchoolGuard";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getDB, getStudentsBySchool, getStudentsByTeacher } from "@/lib/storage/db";
+import { createClient } from "@/lib/supabase/client";
 import { createStudent, updateStudent, softDeleteStudent } from "@/lib/storage/mutations";
+import { syncNow } from "@/lib/storage/syncEngine";
 import type { Student, SubscriptionTier, MemorizationAmount, AppUser } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import Modal, { ModalSection } from "@/components/ui/Modal";
@@ -798,18 +800,57 @@ function StudentsPage() {
   const loadStudents = useCallback(async () => {
     if (!school?.id || !user?.id) return;
     setLoading(true);
-    const db = getDB();
 
     if (isPrincipal || user.role === "super_admin") {
-      const schoolTeachers = await db.users.where("schoolId").equals(school.id).filter(u => u.role === "teacher").toArray();
-      setTeachers(schoolTeachers.sort((a, b) => a.displayName.localeCompare(b.displayName, "ar")));
+      const supabase = createClient();
+      
+      // جلب المعلمين من Supabase
+      const { data: usersData } = await supabase
+        .from("users")
+        .select("id, display_name, group_name")
+        .eq("school_id", school.id)
+        .eq("role", "teacher")
+        .eq("is_active", true)
+        .order("display_name", { ascending: true });
 
-      let data = await getStudentsBySchool(school.id);
+      setTeachers((usersData || []).map(u => ({
+         id: u.id, displayName: u.display_name, groupName: u.group_name 
+      })) as any[]);
+
+      // جلب الطلاب مباشرة من Supabase لضمان التحديث الفوري المباشر للحساب الإداري
+      let query = supabase.from("students").select("*").eq("school_id", school.id);
+      
       if (selectedTeacherId !== "all") {
-        data = data.filter((s) => s.teacherId === selectedTeacherId);
+        query = query.eq("teacher_id", selectedTeacherId);
       }
-      setStudents(data);
+      
+      const { data: studentsData } = await query.order("full_name", { ascending: true });
+      
+      const mapped: Student[] = (studentsData || []).map((s: any) => ({
+        id: s.id,
+        schoolId: s.school_id,
+        teacherId: s.teacher_id,
+        groupName: s.group_name || "",
+        fullName: s.full_name || "",
+        gender: s.gender,
+        birthDate: s.birth_date || "",
+        educationalLevel: s.educational_level || "ابتدائي",
+        guardianName: s.guardian_name || "",
+        phone1: s.phone1 || "",
+        phone2: s.phone2 || "",
+        status: s.status,
+        subscriptionTier: s.subscription_tier,
+        memorizedSurahsCount: s.memorized_surahs_count || 0,
+        dailyMemorizationAmount: s.daily_memorization_amount || "صفحة",
+        registrationDate: s.registration_date || "",
+        createdAt: s.created_at || "",
+        updatedAt: s.updated_at || "",
+        currentSurahId: s.current_surah_id,
+      }));
+
+      setStudents(mapped);
     } else {
+      const db = getDB();
       const data = await getStudentsByTeacher(user.id);
       setStudents(data);
     }
@@ -875,6 +916,7 @@ function StudentsPage() {
         ...form,
       });
     }
+    await syncNow();
     await loadStudents();
   };
 
@@ -897,6 +939,7 @@ function StudentsPage() {
       groupName: newGroupName,
       transferHistory: [...(student.transferHistory ?? []), transferRecord],
     });
+    await syncNow();
     await loadStudents();
   };
 
@@ -905,6 +948,7 @@ function StudentsPage() {
     if (!deleteTarget) return;
     await softDeleteStudent(deleteTarget.id, "حذف يدوي من لوحة التحكم");
     setDeleteTarget(null);
+    await syncNow();
     await loadStudents();
   };
 
