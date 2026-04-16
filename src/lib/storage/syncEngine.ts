@@ -202,6 +202,7 @@ export function stopSyncEngine(): void {
 
 export async function syncNow(): Promise<void> {
   await performSync();
+  await pullSync();
 }
 
 // ─── إحصائيات المزامنة ───────────────────────────────────

@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getDB } from "@/lib/storage/db";
 import { createPayment, updatePaymentStatus } from "@/lib/storage/mutations";
+import { getCurrencySymbol } from "@/lib/utils";
 import type { Student, Payment, PaymentStatus } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -23,7 +24,7 @@ import {
 
 function buildSeasonOptions() {
   const currentYear = new Date().getFullYear();
-  const years = [currentYear - 1, currentYear, currentYear + 1];
+  const years = [currentYear];
   const options: { value: string; label: string }[] = [];
   for (const year of years) {
     getYearSeasons(year).forEach((s) => {
@@ -53,7 +54,7 @@ const STATUS_CFG: Record<PaymentStatus, { label: string; color: string; bg: stri
 // ─── دالة وسيلة واتسآب ───────────────────────────────────
 
 
-function sendWhatsApp(student: Student, payment: Payment, season: string, schoolName: string) {
+function sendWhatsApp(student: Student, payment: Payment, season: string, schoolName: string, schoolCountry?: string) {
   const phone = student.phone1.replace(/\D/g, "");
   const normalizedPhone = phone.startsWith("0") ? "213" + phone.slice(1) : phone;
   const receiptNum = payment.id.slice(-6).toUpperCase();
@@ -65,7 +66,7 @@ function sendWhatsApp(student: Student, payment: Payment, season: string, school
     `نؤكد استلام اشتراك الطالب: *${student.fullName}*`,
     ``,
     `• الفصل: ${seasonLabel}`,
-    `• المبلغ: *${payment.amount} دج*`,
+    `• المبلغ: *${payment.amount} ${getCurrencySymbol(schoolCountry)}*`,
     `• رقم الوصل: #${receiptNum}`,
     ``,
     `جزاكم الله خيراً 🌿`,
@@ -88,6 +89,7 @@ function StudentPaymentRow({
   payment?: Payment;
   season: string;
   schoolName: string;
+  schoolCountry?: string;
   onToggle: (status: PaymentStatus) => void;
 }) {
   const status: PaymentStatus = payment?.status ?? "unpaid";
@@ -118,7 +120,7 @@ function StudentPaymentRow({
       {/* واتسآب (عند الدفع فقط) */}
       {status === "paid" && payment && student.phone1 && (
         <button
-          onClick={() => sendWhatsApp(student, payment, season, schoolName)}
+          onClick={() => sendWhatsApp(student, payment, season, schoolName, schoolCountry)}
           className="w-8 h-8 rounded-xl bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center text-emerald-600 transition-colors shrink-0"
           title="إرسال وصل عبر واتسآب">
           <MessageCircle className="w-3.5 h-3.5" />
@@ -153,8 +155,15 @@ function DuesPage() {
     if (!user?.id || !school?.id) return;
     setLoading(true);
     const db = getDB();
-    const studs = await db.students.where("teacherId").equals(user.id)
-      .and((s) => s.status === "نشط").toArray();
+    const isPrincipal = user.role === "principal" || user.role === "super_admin";
+    let studs: Student[] = [];
+    if (isPrincipal) {
+      studs = await db.students.where("schoolId").equals(school.id)
+        .and((s) => s.status === "نشط").toArray();
+    } else {
+      studs = await db.students.where("teacherId").equals(user.id)
+        .and((s) => s.status === "نشط").toArray();
+    }
     studs.sort((a, b) => a.fullName.localeCompare(b.fullName, "ar"));
     const pays = await db.payments.where("schoolId").equals(school.id)
       .and((p) => p.date === season).toArray();
@@ -234,7 +243,7 @@ function DuesPage() {
           { label: "مدفوع", value: stats.paid, color: "text-emerald-700", bg: "bg-emerald-50" },
           { label: "غير مدفوع", value: stats.unpaid, color: "text-red-600", bg: "bg-red-50" },
           { label: "معفى", value: stats.exempted, color: "text-blue-600", bg: "bg-blue-50" },
-          { label: "المحصّل (دج)", value: stats.collected.toLocaleString("ar-DZ"), color: "text-[var(--color-primary-dark)]", bg: "bg-[var(--color-primary-light)]" },
+          { label: `المحصّل (${getCurrencySymbol(school?.country)})`, value: stats.collected.toLocaleString("ar-DZ"), color: "text-[var(--color-primary-dark)]", bg: "bg-[var(--color-primary-light)]" },
         ].map(({ label, value, color, bg }) => (
           <div key={label} className={`${bg} rounded-2xl p-4`}>
             <p className={`text-xl font-black ${color}`} style={{ fontFamily: "var(--font-headline)" }}>{value}</p>

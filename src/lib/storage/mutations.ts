@@ -91,8 +91,41 @@ export async function updateStudent(
   id: string,
   patches: Partial<Student>
 ): Promise<void> {
-  const existing = await getDB().students.get(id);
-  if (!existing) throw new Error(`الطالب ${id} غير موجود`);
+  let existing = await getDB().students.get(id);
+  
+  if (!existing) {
+    const { createClient } = await import('@/lib/supabase/client');
+    const supabase = createClient();
+    const { data: remoteData, error } = await supabase.from('students').select('*').eq('id', id).single();
+    if (error || !remoteData) {
+      throw new Error(`الطالب ${id} غير موجود محليا أو في الخادم`);
+    }
+    existing = {
+      id: remoteData.id,
+      schoolId: remoteData.school_id,
+      teacherId: remoteData.teacher_id,
+      groupName: remoteData.group_name || "",
+      fullName: remoteData.full_name || "",
+      gender: remoteData.gender,
+      birthDate: remoteData.birth_date || "",
+      educationalLevel: remoteData.educational_level || "ابتدائي",
+      guardianName: remoteData.guardian_name || "",
+      phone1: remoteData.phone1 || "",
+      phone2: remoteData.phone2 || "",
+      status: remoteData.status,
+      subscriptionTier: remoteData.subscription_tier,
+      memorizedSurahsCount: remoteData.memorized_surahs_count || 0,
+      dailyMemorizationAmount: remoteData.daily_memorization_amount || "صفحة",
+      registrationDate: remoteData.registration_date || "",
+      createdAt: remoteData.created_at || "",
+      updatedAt: remoteData.updated_at || "",
+      currentSurahId: remoteData.current_surah_id,
+      covenants: [],
+      expulsionHistory: [],
+      transferHistory: [],
+    } as Student;
+  }
+  
   const updated = { ...existing, ...patches };
   await saveAndQueue('students', 'update', updated, saveStudent);
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getDB } from "@/lib/storage/db";
 import { createClient } from "@/lib/supabase/client";
+import { getCurrencySymbol } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Bell, AlertTriangle, Clock, UserX, CreditCard,
@@ -125,7 +126,7 @@ function NotificationsPage() {
             type: "overdue_payment",
             severity: "warning",
             title: `دفع متأخر — ${nameMap[p.studentId] ?? "طالب"}`,
-            description: `لم يُسدَّد اشتراك الفصل الحالي. المبلغ: ${p.amount} دج.`,
+            description: `لم يُسدَّد اشتراك الفصل الحالي. المبلغ: ${p.amount} ${getCurrencySymbol(school.country)}.`,
             entityId: p.studentId,
             createdAt: now.toISOString(),
             isRead: false,

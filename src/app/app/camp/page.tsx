@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getDB } from "@/lib/storage/db";
 import { createCampItem, updateCampItem, deleteCampItem } from "@/lib/storage/mutations";
+import { getCurrencySymbol } from "@/lib/utils";
 import type { CampItem, CampItemCategory, CampItemStatus } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -51,12 +52,14 @@ function calcStatus(item: CampItem): CampItemStatus {
 
 function ItemModal({
   schoolId,
+  schoolCountry,
   campYear,
   editItem,
   onSave,
   onClose,
 }: {
   schoolId: string;
+  schoolCountry?: string;
   campYear: string;
   editItem?: CampItem;
   onSave: (item: CampItem) => void;
@@ -143,7 +146,7 @@ function ItemModal({
                   className="input-field text-sm py-2.5 w-full text-center" />
               </div>
               <div>
-                <label className="label-xs mb-1.5 block">التكلفة التقديرية (دج)</label>
+                <label className="label-xs mb-1.5 block">التكلفة التقديرية ({getCurrencySymbol(schoolCountry)})</label>
                 <input type="number" min={0} value={estimatedCost} onChange={e => setEstimatedCost(+e.target.value)}
                   className="input-field text-sm py-2.5 w-full text-center" />
               </div>
@@ -434,7 +437,7 @@ function CampPage() {
               <div className="flex gap-4 text-center">
                 <div><p className="text-2xl font-black">{stats.complete}</p><p className="text-xs text-white/70">مكتمل</p></div>
                 <div><p className="text-2xl font-black">{stats.pending}</p><p className="text-xs text-white/70">معلق</p></div>
-                <div><p className="text-xl font-black">{stats.totalCost.toLocaleString("ar")}</p><p className="text-xs text-white/70">دج تقديري</p></div>
+                <div><p className="text-xl font-black">{stats.totalCost.toLocaleString("ar")}</p><p className="text-xs text-white/70">{getCurrencySymbol(school.country)} تقديري</p></div>
               </div>
             </div>
             <div className="h-3 bg-white/20 rounded-full overflow-hidden">
@@ -520,6 +523,7 @@ function CampPage() {
       {showModal && school && (
         <ItemModal
           schoolId={school.id}
+          schoolCountry={school.country}
           campYear={campYear}
           editItem={editItem}
           onSave={handleSave}

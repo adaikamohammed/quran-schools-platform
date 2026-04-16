@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { startSyncEngine, stopSyncEngine, subscribeSyncStatus, type SyncStatus } from "@/lib/storage/syncEngine";
 import type { AppUser, School } from "@/lib/types";
 
 // Types compatible with existing app expectations
@@ -25,6 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<any | null>(null);
   const [school, setSchool] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({ state: "idle", pendingCount: 0, lastSyncAt: new Date().toISOString() });
   const supabase = createClient();
 
   useEffect(() => {
@@ -98,6 +100,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [supabase]);
 
+  useEffect(() => {
+    if (user) {
+      startSyncEngine();
+      const unsub = subscribeSyncStatus((s) => setSyncStatus(s));
+      return () => {
+        unsub();
+        stopSyncEngine();
+      };
+    }
+  }, [user]);
+
   const login = async (email: string, pass: string): Promise<void> => {
     // Calling the API route so it sets SSR cookies correctly
     const res = await fetch("/api/auth/login", {
@@ -152,9 +165,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isSuperAdmin = role === "super_admin";
   const isPrincipal = role === "principal" || role === "super_admin";
   const isTeacher = role === "teacher" || isPrincipal;
-
-  // Fake sync status to prevent breaking existing UI components relying on it
-  const syncStatus = { state: "idle", pendingCount: 0, lastSyncAt: new Date().toISOString() };
 
   return (
     <AuthContext.Provider

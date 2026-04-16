@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getDB } from "@/lib/storage/db";
 import { createIssuedDocument, logActivity } from "@/lib/storage/mutations";
+import { getCurrencySymbol } from "@/lib/utils";
 import type { Student, AppUser, Payment, IssuedDocument, DocumentType } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -171,7 +172,7 @@ function buildDocumentHTML(
           <tr><td>الفوج</td><td>${student.groupName}</td></tr>
           <tr><td>الفئة</td><td>${student.subscriptionTier}</td></tr>
           <tr><td>الفصل الدراسي</td><td>${options.season ?? "—"}</td></tr>
-          <tr><td>المبلغ المدفوع</td><td><strong>${options.amount ?? "—"} دج</strong></td></tr>
+          <tr><td>المبلغ المدفوع</td><td><strong>${options.amount ?? "—"} ${getCurrencySymbol(school?.country)}</strong></td></tr>
           <tr><td>تاريخ الدفع</td><td>${date}</td></tr>
         </table>
         <div class="footer">

@@ -16,6 +16,7 @@ import {
   MoreVertical, Edit, Trash2, Eye, Check,
   ArrowUpDown, Download, Share2, MessageCircle,
   ArrowLeftRight, Clock, History, Loader2,
+  LayoutGrid, LayoutList
 } from "lucide-react";
 import Link from "next/link";
 import { getDialCode } from "@/lib/countries";
@@ -450,12 +451,26 @@ function TransferModal({
 
   useEffect(() => {
     if (!open) return;
-    const db = getDB();
-    db.users.where("schoolId").equals(schoolId).and(u => u.role === "teacher").toArray().then(setTeachers);
-    db.students.where("schoolId").equals(schoolId).toArray().then(studs => {
-      const groups = [...new Set(studs.map(s => s.groupName))].filter(Boolean);
-      setExistingGroups(groups);
-    });
+    
+    const loadData = async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("users")
+        .select("id, display_name, group_name")
+        .eq("school_id", schoolId)
+        .eq("role", "teacher")
+        .eq("is_active", true);
+        
+      if (data) {
+        setTeachers(data.map(u => ({
+          id: u.id,
+          displayName: u.display_name,
+          groupName: u.group_name || "بدون اسم"
+        })) as any[]);
+      }
+    };
+    
+    loadData();
     setNewTeacherId("");
     setNewGroupName("");
     setReason("");
@@ -499,25 +514,25 @@ function TransferModal({
           </div>
         </div>
 
-        {/* الشيخ الجديد */}
+        {/* الفوج والمعلم الجديد */}
         <div className="space-y-1">
-          <label className="text-xs font-black text-gray-500 uppercase tracking-wider">إلى شيخ *</label>
-          <select value={newTeacherId} onChange={e => setNewTeacherId(e.target.value)}
+          <label className="text-xs font-black text-gray-500 uppercase tracking-wider">إلى الفوج والمعلم *</label>
+          <select 
+            value={newTeacherId} 
+            onChange={e => {
+              const tid = e.target.value;
+              setNewTeacherId(tid);
+              const teacher = teachers.find(t => t.id === tid);
+              if (teacher) setNewGroupName(teacher.groupName || "بدون اسم");
+            }}
             className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:border-[var(--color-primary)]/60">
-            <option value="">اختر المعلم الجديد...</option>
-            {teachers.map(t => <option key={t.id} value={t.id}>{t.displayName}</option>)}
+            <option value="">اختر الفوج الجديد...</option>
+            {teachers.map(t => (
+              <option key={t.id} value={t.id}>
+                {t.groupName ? `فوج ${t.groupName}` : "بدون فوج"} - أ. {t.displayName}
+              </option>
+            ))}
           </select>
-        </div>
-
-        {/* الفوج الجديد */}
-        <div className="space-y-1">
-          <label className="text-xs font-black text-gray-500 uppercase tracking-wider">إلى فوج *</label>
-          <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)}
-            list="transfer-groups-list" placeholder="اسم الفوج الجديد"
-            className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:border-[var(--color-primary)]/60" />
-          <datalist id="transfer-groups-list">
-            {existingGroups.map(g => <option key={g} value={g} />)}
-          </datalist>
         </div>
 
         {/* سبب النقل */}
@@ -788,7 +803,7 @@ function StudentsPage() {
   const [timelineTarget, setTimelineTarget] = useState<Student | null>(null);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<"الكل" | "نشط" | "موقوف" | "مطرود">("الكل");
-  const [filterGroup, setFilterGroup] = useState("الكل");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [filterGender, setFilterGender] = useState<"الكل" | "ذكر" | "أنثى">("الكل");
   const [sortBy, setSortBy] = useState<"name" | "surahs" | "date">("name");
   const [currentPage, setCurrentPage] = useState(1);
@@ -874,9 +889,8 @@ function StudentsPage() {
         s.guardianName.toLowerCase().includes(search.toLowerCase()) ||
         s.phone1.includes(search);
       const matchStatus = filterStatus === "الكل" || s.status === filterStatus;
-      const matchGroup = filterGroup === "الكل" || s.groupName === filterGroup;
       const matchGender = filterGender === "الكل" || s.gender === filterGender;
-      return matchSearch && matchStatus && matchGroup && matchGender;
+      return matchSearch && matchStatus && matchGender;
     });
 
     result.sort((a, b) => {
@@ -887,10 +901,10 @@ function StudentsPage() {
     });
 
     return result;
-  }, [students, search, filterStatus, filterGroup, filterGender, sortBy]);
+  }, [students, search, filterStatus, filterGender, sortBy]);
 
   // Reset to page 1 when filters change
-  useEffect(() => { setCurrentPage(1); }, [search, filterStatus, filterGroup, filterGender, sortBy]);
+  useEffect(() => { setCurrentPage(1); }, [search, filterStatus, filterGender, sortBy]);
 
   // Paginated slice
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
@@ -1068,30 +1082,36 @@ function StudentsPage() {
             </button>
           ))}
 
-          {groups.length > 0 && (
-            <>
-              <div className="w-px bg-gray-200 mx-1" />
-              <select
-                value={filterGroup}
-                onChange={(e) => setFilterGroup(e.target.value)}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-gray-100 text-gray-600 border-0 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
-              >
-                <option value="الكل">كل الأفواج</option>
-                {groups.map((g) => <option key={g}>{g}</option>)}
-              </select>
-            </>
-          )}
-
           {/* ترتيب */}
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-gray-100 text-gray-600 border-0 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 mr-auto"
+            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-gray-100 text-gray-600 border-0 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
           >
             <option value="name">ترتيب: الاسم</option>
             <option value="surahs">ترتيب: عدد السور</option>
             <option value="date">ترتيب: تاريخ الإضافة</option>
           </select>
+
+          {/* أزرار العرض جدول/بطاقات */}
+          <div className="flex bg-gray-100 p-1 rounded-full text-xs font-bold mr-auto">
+             <button
+                onClick={() => setViewMode("table")}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full transition-all ${
+                  viewMode === "table" ? "bg-[var(--color-primary)] text-white shadow-sm" : "text-gray-600 hover:text-gray-900"
+                }`}
+             >
+               جدول <LayoutList className="w-4 h-4" />
+             </button>
+             <button
+                onClick={() => setViewMode("grid")}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full transition-all ${
+                  viewMode === "grid" ? "bg-[var(--color-primary)] text-white shadow-sm" : "text-gray-600 hover:text-gray-900"
+                }`}
+             >
+               بطاقات <LayoutGrid className="w-4 h-4" />
+             </button>
+          </div>
         </div>
       </div>
 
@@ -1140,20 +1160,101 @@ function StudentsPage() {
         </div>
       ) : (
         <>
-          <motion.div layout className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <AnimatePresence mode="popLayout">
-              {paginatedStudents.map((student) => (
-                <StudentCard
-                  key={student.id}
-                  student={student}
-                  onEdit={handleEdit}
-                  onDelete={setDeleteTarget}
-                  onTransfer={setTransferTarget}
-                  onHistory={setTimelineTarget}
-                />
-              ))}
-            </AnimatePresence>
-          </motion.div>
+          {viewMode === "grid" ? (
+            <motion.div layout className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <AnimatePresence mode="popLayout">
+                {paginatedStudents.map((student) => (
+                  <StudentCard
+                    key={student.id}
+                    student={student}
+                    onEdit={handleEdit}
+                    onDelete={setDeleteTarget}
+                    onTransfer={setTransferTarget}
+                    onHistory={setTimelineTarget}
+                  />
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          ) : (
+             <div className="bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] overflow-hidden shadow-sm">
+               <div className="overflow-x-auto">
+                 <table className="w-full text-sm text-right">
+                   <thead className="bg-gray-50/80 dark:bg-white/5 border-b border-gray-100 dark:border-white/5 text-gray-500 dark:text-gray-400 font-black">
+                     <tr>
+                       <th className="px-5 py-4 w-1/3">الاسم والفوج</th>
+                       <th className="px-4 py-4 w-1/6">الحالة</th>
+                       <th className="px-4 py-4 w-1/6">الحفظ</th>
+                       <th className="px-4 py-4 w-1/6">رقم الولي</th>
+                       <th className="px-4 py-4 text-center w-1/6">إجراءات</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                     {paginatedStudents.map((student) => (
+                       <tr key={student.id} className="hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors">
+                         <td className="px-5 py-3">
+                           <div className="flex items-center gap-3">
+                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-black shrink-0 ${
+                                student.gender === "أنثى"
+                                  ? "bg-gradient-to-br from-pink-400 to-rose-500"
+                                  : "bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)]"
+                              }`}>
+                                {student.fullName[0]}
+                              </div>
+                              <div>
+                                <p className="font-bold text-gray-900 dark:text-white leading-snug truncate max-w-[150px] sm:max-w-xs">{student.fullName}</p>
+                                <p className="text-[11px] text-gray-400 font-medium">{student.groupName || "بدون فوج"}</p>
+                              </div>
+                           </div>
+                         </td>
+                         <td className="px-4 py-3">
+                           <span className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-bold leading-none ${
+                             student.status === "نشط" ? "bg-emerald-50 text-emerald-700" :
+                             student.status === "موقوف" ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"
+                           }`}>
+                             {student.status}
+                           </span>
+                         </td>
+                         <td className="px-4 py-3">
+                           <div className="flex items-center gap-1.5 opacity-80">
+                             <BookOpen className="w-3.5 h-3.5 text-[var(--color-primary)]" />
+                             <span className="font-bold text-gray-700 dark:text-gray-300">
+                               {student.memorizedSurahsCount} <span className="font-medium text-[10px]">سورة</span>
+                             </span>
+                           </div>
+                         </td>
+                         <td className="px-4 py-3">
+                           <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                             <Phone className="w-3 h-3" />
+                             <span dir="ltr" className="font-mono text-xs">{student.phone1}</span>
+                           </div>
+                         </td>
+                         <td className="px-4 py-3">
+                           <div className="flex items-center justify-center gap-1.5">
+                             <Link href={`/app/students/${student.id}`} className="w-8 h-8 rounded-xl bg-gray-50 hover:bg-white hover:text-blue-600 hover:shadow-sm border border-transparent hover:border-gray-200 text-gray-400 flex items-center justify-center transition-all" title="عرض الملف">
+                               <Eye className="w-4 h-4" />
+                             </Link>
+                             <button onClick={() => handleEdit(student)} className="w-8 h-8 rounded-xl bg-gray-50 hover:bg-white hover:text-amber-500 hover:shadow-sm border border-transparent hover:border-gray-200 text-gray-400 flex items-center justify-center transition-all" title="تعديل">
+                               <Edit className="w-4 h-4" />
+                             </button>
+                             <div className="w-px h-4 bg-gray-200 mx-0.5" />
+                             <button onClick={() => setTransferTarget(student)} className="w-8 h-8 rounded-xl bg-gray-50 hover:bg-white hover:text-blue-600 hover:shadow-sm border border-transparent hover:border-gray-200 text-gray-400 flex items-center justify-center transition-all" title="نقل إلى فوج آخر">
+                               <ArrowLeftRight className="w-4 h-4" />
+                             </button>
+                             <button onClick={() => setTimelineTarget(student)} className="w-8 h-8 rounded-xl bg-gray-50 hover:bg-white hover:text-purple-600 hover:shadow-sm border border-transparent hover:border-gray-200 text-gray-400 flex items-center justify-center transition-all" title="سيرة الطالب">
+                               <History className="w-4 h-4" />
+                             </button>
+                             <button onClick={() => setDeleteTarget(student)} className="w-8 h-8 rounded-xl bg-gray-50 hover:bg-white hover:text-red-500 hover:shadow-sm border border-transparent hover:border-gray-200 text-gray-400 flex items-center justify-center transition-all" title="حذف">
+                               <Trash2 className="w-4 h-4" />
+                             </button>
+                           </div>
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
+             </div>
+          )}
 
           {/* Pagination */}
           {totalPages > 1 && (
