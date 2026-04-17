@@ -1,7 +1,7 @@
 "use client";
 import SchoolGuard from "@/components/layout/SchoolGuard";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getDB, getSessionsByDateRange } from "@/lib/storage/db";
 import { createOrUpdateSession } from "@/lib/storage/mutations";
@@ -24,16 +24,20 @@ import {
   ChevronRight, ChevronLeft, Calendar, ClipboardList,
   Save, CheckCircle2, AlertTriangle, Loader2, BookOpen,
   MessageSquare, Plus, RefreshCw, ChevronDown, Users,
-  Clock, X, Info, LayoutGrid, CalendarDays
+  Clock, X, Info, LayoutGrid, CalendarDays,
+  Zap, Sparkles, ChevronUp
 } from "lucide-react";
 import { v4 as uuid } from "uuid";
 
 // ─── الثوابت ─────────────────────────────────────────────
 
+// الأنواع المتاحة لكلا الحصتين (حصة أولى وثانية)
 const SESSION_TYPES: SessionType[] = [
-  "حصة أساسية", "حصة تعويضية", "حصة أنشطة",
-  "يوم عطلة", "غياب المعلم", "حصة إضافية",
+  "حصة أساسية", "حصة أنشطة", "يوم عطلة", "غياب المعلم",
 ];
+
+// الأنواع المتضمنة لسورة
+const SESSION_TYPES_WITH_SURAH = ["حصة أساسية", "حصة تعويضية", "حصة إضافية"];
 
 const ATTENDANCE_OPTIONS: { value: AttendanceStatus; label: string; color: string }[] = [
   { value: "حاضر", label: "حاضر", color: "bg-emerald-500" },
@@ -83,6 +87,16 @@ function formatHijri(dateStr: string): string {
   } catch { return ""; }
 }
 
+// ─── قوالب الملاحظات السريعة ─────────────────────────────
+const NOTE_TEMPLATES = [
+  { label: "تحسّن 📈", value: "لاحظت تحسناً واضحاً في أداء الطالب" },
+  { label: "ثابت ➡️", value: "أداء الطالب ثابت ومنتظم" },
+  { label: "تراجع 📉", value: "لاحظت تراجعاً في مستوى الطالب، يحتاج متابعة" },
+  { label: "مرض 🤒", value: "الطالب يشكو من المرض" },
+  { label: "نشيط ⚡", value: "الطالب متحمس ونشيط جداً اليوم" },
+  { label: "مشتّت 🌀", value: "الطالب مشتت التركيز، يحتاج تحفيزاً" },
+];
+
 // ─── سطر الطالب ──────────────────────────────────────────
 
 interface StudentRowProps {
@@ -92,11 +106,70 @@ interface StudentRowProps {
   sessionSurahId?: number;
   enableTajweedTracking?: boolean;
   sessionNum: 1 | 2;
+  quickMode?: boolean;
 }
 
-function StudentRow({ student, record, onChange, sessionSurahId, enableTajweedTracking, sessionNum }: StudentRowProps) {
+function StudentRow({ student, record, onChange, sessionSurahId, enableTajweedTracking, sessionNum, quickMode }: StudentRowProps) {
   const isAbsent = record.attendance === "غائب";
   const [expanded, setExpanded] = useState(false);
+  const [showNoteTemplates, setShowNoteTemplates] = useState(false);
+
+  // في وضع السرعة: سطر مضغوط بأزرار كبيرة فقط
+  if (quickMode) {
+    return (
+      <div className={`border-b border-gray-100 last:border-0 flex items-center gap-2 px-3 py-2.5 transition-colors ${
+        isAbsent ? "bg-red-50/60" :
+        record.attendance === "حاضر" ? "bg-emerald-50/40" :
+        record.attendance === "متأخر" ? "bg-amber-50/40" :
+        "hover:bg-gray-50/30"
+      }`}>
+        {/* Badge حالة */}
+        <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black shrink-0 ${
+          isAbsent ? "bg-red-500" :
+          record.attendance === "حاضر" ? "bg-emerald-500" :
+          record.attendance === "متأخر" ? "bg-amber-500" :
+          record.attendance === "تعويض" ? "bg-blue-400" :
+          "bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)]"
+        }`}>
+          {isAbsent ? "✗" : record.attendance === "حاضر" ? "✓" : record.attendance === "متأخر" ? "⏰" : record.attendance === "تعويض" ? "↩" : student.fullName[0]}
+        </div>
+        <p className="font-bold text-sm text-gray-800 flex-1 min-w-0 truncate">{student.fullName}</p>
+        {/* أزرار سريعة كبيرة */}
+        <div className="flex gap-1 shrink-0">
+          {ATTENDANCE_OPTIONS.filter(opt => sessionNum !== 1 || opt.value !== "تعويض").map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => {
+                onChange({
+                  attendance: opt.value,
+                  ...(opt.value === "غائب" ? { memorization: null, behavior: null } :
+                    !record.memorization ? { memorization: "لم يحفظ" } : {})
+                });
+              }}
+              className={`h-8 px-2.5 rounded-lg text-[11px] font-black transition-all ${
+                record.attendance === opt.value
+                  ? `${opt.color} text-white shadow-sm scale-105`
+                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {isAbsent && student.phone1 && (
+          <a
+            href={`https://wa.me/${student.phone1.replace(/\D/g, "")}?text=${encodeURIComponent(
+              `السلام عليكم ورحمة الله،\n\nنُعلمكم بغياب ابنكم/ابنتكم *${student.fullName}* عن الحصة اليوم ${new Date().toLocaleDateString("ar-DZ", { weekday: "long", day: "numeric", month: "long" })}.\n\nنرجو التواصل معنا إن كان هناك عذر.\nجزاكم الله خيراً 🌿`
+            )}`}
+            target="_blank" rel="noopener noreferrer"
+            className="w-7 h-7 rounded-lg bg-emerald-100 hover:bg-emerald-200 flex items-center justify-center text-emerald-700 transition-colors shrink-0"
+          >
+            <MessageSquare className="w-3 h-3" />
+          </a>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={`border-b border-gray-100 last:border-0 transition-colors ${isAbsent ? "bg-red-50/50" : "hover:bg-gray-50/50"}`}>
@@ -321,9 +394,40 @@ function StudentRow({ student, record, onChange, sessionSurahId, enableTajweedTr
                 </div>
               </div>
 
-              {/* ملاحظات */}
+              {/* ملاحظات مع قوالب سريعة */}
               <div>
-                <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2">ملاحظات</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-black text-gray-400 uppercase tracking-wider">ملاحظات</p>
+                  <button
+                    onClick={() => setShowNoteTemplates(v => !v)}
+                    className="text-[10px] font-black text-[var(--color-primary)] hover:underline flex items-center gap-1"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    قوالب سريعة
+                    {showNoteTemplates ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
+                  </button>
+                </div>
+                {/* قوالب */}
+                <AnimatePresence>
+                  {showNoteTemplates && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mb-2"
+                    >
+                      <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 rounded-xl border border-gray-100">
+                        {NOTE_TEMPLATES.map(t => (
+                          <button
+                            key={t.label}
+                            onClick={() => { onChange({ notes: t.value }); setShowNoteTemplates(false); }}
+                            className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white border border-gray-200 text-gray-700 hover:border-[var(--color-primary)]/40 hover:text-[var(--color-primary)] transition-colors"
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
                 <input
                   value={record.notes ?? ""}
                   onChange={(e) => onChange({ notes: e.target.value })}
@@ -362,10 +466,7 @@ function SessionSetup({
   const selectedSurah = surahs.find((s) => s.id === surahId);
   const isAbsence = sessionType === "غياب المعلم";
   const isHoliday = sessionType === "يوم عطلة";
-  const showSurah = ["حصة أساسية", "حصة تعويضية", "حصة إضافية"].includes(sessionType);
-  const availableSessionTypes = sessionNum === 1
-    ? SESSION_TYPES.filter(t => t !== "حصة تعويضية" && t !== "حصة إضافية")
-    : SESSION_TYPES;
+  const showSurah = SESSION_TYPES_WITH_SURAH.includes(sessionType);
 
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-4">
@@ -373,7 +474,7 @@ function SessionSetup({
       <div>
         <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2">نوع الحصة</p>
         <div className="flex flex-wrap gap-1.5">
-          {availableSessionTypes.map((t) => (
+          {SESSION_TYPES.map((t) => (
             <button
               key={t}
               onClick={() => onChangeType(t)}
@@ -463,6 +564,7 @@ function SessionsPage() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"daily" | "weekly" | "monthly">("daily");
   const [sessionsList, setSessionsList] = useState<DailySession[]>([]);
+  const [quickMode, setQuickMode] = useState(false);
 
   // إعداد الحصة
   const [sessionType, setSessionType] = useState<SessionType>("حصة أساسية");
@@ -799,16 +901,14 @@ function SessionsPage() {
         </div>
 
         {/* تنقل التاريخ */}
-        <div className="flex items-center gap-2 bg-white border border-[var(--color-border)] rounded-2xl p-1">
+        <div className="flex items-center gap-1 bg-white border border-[var(--color-border)] rounded-2xl p-1">
           <button
             onClick={() => setSelectedDate(addDays(selectedDate, -1))}
             className="w-9 h-9 rounded-xl hover:bg-gray-100 flex items-center justify-center text-gray-600 transition-colors"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
-
-          {/* اختيار التاريخ */}
-          <div className="relative flex items-center gap-2 px-3">
+          <div className="relative flex items-center gap-2 px-2">
             <Calendar className="w-4 h-4 text-[var(--color-primary)] shrink-0" />
             <input
               type="date"
@@ -818,7 +918,6 @@ function SessionsPage() {
               className="text-sm font-bold text-gray-800 bg-transparent border-0 focus:outline-none cursor-pointer"
             />
           </div>
-
           <button
             onClick={() => setSelectedDate(addDays(selectedDate, 1))}
             disabled={selectedDate >= todayStr()}
@@ -826,7 +925,6 @@ function SessionsPage() {
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
-
           <button
             onClick={() => setSelectedDate(todayStr())}
             disabled={selectedDate === todayStr()}
@@ -835,6 +933,31 @@ function SessionsPage() {
             اليوم
           </button>
         </div>
+      </div>
+
+      {/* ─── فلاتر التاريخ السريعة ─── */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { label: "اليوم",           offset: 0 },
+          { label: "أمس",             offset: -1 },
+          { label: "أول أمس",         offset: -2 },
+        ].map(({ label, offset }) => {
+          const target = addDays(todayStr(), offset);
+          const isActive = selectedDate === target;
+          return (
+            <button
+              key={label}
+              onClick={() => setSelectedDate(target)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
+                isActive
+                  ? "bg-[var(--color-primary)] text-white shadow-sm"
+                  : "bg-white border border-[var(--color-border)] text-gray-600 hover:border-[var(--color-primary)]/30 hover:text-[var(--color-primary)]"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       {/* ─── أزرار التبديل بنظام العرض ─── */}
@@ -998,43 +1121,59 @@ function SessionsPage() {
                     </div>
                   </div>
 
-                  {/* إجراءات سريعة (Bulk Actions) */}
-                  <div className="px-4 py-2 bg-white border-b border-gray-100 flex flex-wrap gap-2">
+                  {/* شريط الأوضاع + الإجراءات الجماعية */}
+                  <div className="px-4 py-2.5 bg-white border-b border-gray-100 flex flex-wrap items-center gap-2">
+                    {/* وضع التسجيل السريع */}
+                    <button
+                      onClick={() => setQuickMode(q => !q)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all border ${
+                        quickMode
+                          ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-[var(--color-primary)]/30"
+                      }`}
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      {quickMode ? "وضع سريع ✓" : "وضع سريع"}
+                    </button>
+
+                    <div className="w-px h-5 bg-gray-200" />
+
+                    {/* إجراءات جماعية */}
                     <button
                       onClick={() => {
                         setRecords(prev => prev.map(r => r.attendance === "" ? { ...r, attendance: "حاضر", memorization: r.memorization || "لم يحفظ" } : r));
                         setSaved(false);
                       }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                      className="px-3 py-1.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-100"
                     >
-                      تحضير الجميع
+                      ✓ تحضير الجميع
                     </button>
                     <button
                       onClick={() => {
                         setRecords(prev => prev.map(r => ["حاضر", "متأخر", "تعويض"].includes(r.attendance) ? { ...r, review: true } : r));
                         setSaved(false);
                       }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                      className="px-3 py-1.5 rounded-lg text-xs font-black bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors border border-blue-100"
                     >
-                      مراجعة الجميع
+                      📖 مراجعة الجميع
                     </button>
                     <button
                       onClick={() => {
                         setRecords(prev => prev.map(r => ["حاضر", "متأخر", "تعويض"].includes(r.attendance) ? { ...r, behavior: "هادئ" } : r));
                         setSaved(false);
                       }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                      className="px-3 py-1.5 rounded-lg text-xs font-black bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors border border-purple-100"
                     >
-                      هدوء الجميع
+                      😊 هدوء الجميع
                     </button>
                     <button
                       onClick={() => {
                         setRecords(prev => prev.map(r => ["حاضر", "متأخر", "تعويض"].includes(r.attendance) && !r.memorization ? { ...r, memorization: "جيد" } : r));
                         setSaved(false);
                       }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                      className="px-3 py-1.5 rounded-lg text-xs font-black bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors border border-amber-100"
                     >
-                      تسميع جيد للجميع
+                      ⭐ تسميع جيد للجميع
                     </button>
                   </div>
 
@@ -1057,22 +1196,58 @@ function SessionsPage() {
                         sessionSurahId={surahId}
                         enableTajweedTracking={school?.settings?.enableTajweedTracking ?? false}
                         sessionNum={sessionNum}
+                        quickMode={quickMode}
                       />
                     );
                   })}
 
-                  {/* Bar الحضور */}
+                  {/* Bar الحضور المُحسَّن */}
                   {stats.filled > 0 && (
-                    <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
-                      <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5 font-medium">
-                        <span>نسبة الحضور</span>
-                        <span>{stats.present}/{stats.total}</span>
+                    <div className="px-4 py-3 bg-gray-50/80 border-t border-gray-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3 text-xs font-bold">
+                          <span className="flex items-center gap-1 text-emerald-600">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                            {stats.present} حاضر
+                          </span>
+                          <span className="flex items-center gap-1 text-red-500">
+                            <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                            {stats.absent} غائب
+                          </span>
+                          {records.filter(r => r.attendance === "متأخر").length > 0 && (
+                            <span className="flex items-center gap-1 text-amber-600">
+                              <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
+                              {records.filter(r => r.attendance === "متأخر").length} متأخر
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-sm font-black ${
+                          stats.rate >= 80 ? "text-emerald-600" :
+                          stats.rate >= 60 ? "text-amber-600" : "text-red-500"
+                        }`}>{stats.rate}%</span>
                       </div>
-                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div className="h-3 bg-gray-200 rounded-full overflow-hidden flex">
+                        {/* حاضر */}
                         <div
-                          className="h-full bg-gradient-to-l from-[var(--color-primary)] to-emerald-400 rounded-full transition-all duration-500"
-                          style={{ width: `${stats.rate}%` }}
+                          className="h-full bg-emerald-500 transition-all duration-500"
+                          style={{ width: `${stats.total > 0 ? (stats.present / stats.total) * 100 : 0}%` }}
                         />
+                        {/* متأخر */}
+                        <div
+                          className="h-full bg-amber-400 transition-all duration-500"
+                          style={{ width: `${stats.total > 0 ? (records.filter(r=>r.attendance==="متأخر").length / stats.total) * 100 : 0}%` }}
+                        />
+                        {/* تعويض */}
+                        <div
+                          className="h-full bg-blue-400 transition-all duration-500"
+                          style={{ width: `${stats.total > 0 ? (records.filter(r=>r.attendance==="تعويض").length / stats.total) * 100 : 0}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                        <span>{stats.filled} سُجِّل من {stats.total}</span>
+                        {stats.total > stats.filled && (
+                          <span className="text-amber-500">{stats.total - stats.filled} لم يُسجَّلوا بعد</span>
+                        )}
                       </div>
                     </div>
                   )}

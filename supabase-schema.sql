@@ -342,3 +342,26 @@ CREATE POLICY "Allow Select for Authenticated" ON public.system_notifications
 
 CREATE POLICY "Allow Delete for Sender" ON public.system_notifications
   FOR DELETE TO authenticated USING (sender_id = auth.uid());
+
+-- ─── 15. طلبات التسجيل ───────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.school_requests (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  school_name   TEXT NOT NULL,
+  city          TEXT NOT NULL DEFAULT '',
+  country       TEXT NOT NULL DEFAULT '',
+  director_name TEXT NOT NULL,
+  email         TEXT NOT NULL,
+  phone         TEXT NOT NULL DEFAULT '',
+  notes         TEXT,
+  status        TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'approved' | 'rejected'
+  reviewed_by   UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  reviewed_at   TIMESTAMP WITH TIME ZONE,
+  created_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE public.school_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Service role bypass" ON public.school_requests
+  FOR ALL USING (true) WITH CHECK (true);
+

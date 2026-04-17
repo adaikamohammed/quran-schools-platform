@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen, Mail, Lock, Eye, EyeOff, Loader2,
   User, Phone, MapPin, Globe, ArrowLeft, CheckCircle2,
-  School, Shield, Zap, Globe2,
+  School, Shield, Zap, Globe2, Calendar
 } from "lucide-react";
 import { getDialCode } from "@/lib/countries";
 
@@ -20,12 +20,17 @@ interface FormData {
   phone: string;
   city: string;
   country: string;
+  schoolType: string;
+  expectedStudents: string;
+  establishmentYear: string;
+  notes: string;
 }
 
 const EMPTY: FormData = {
   schoolName: "", adminName: "", email: "",
   password: "", confirmPassword: "", phone: "",
-  city: "", country: "",
+  city: "", country: "", schoolType: "مدرسة قرآنية مستقلة", 
+  expectedStudents: "من 50 إلى 200 طالباً", establishmentYear: "", notes: ""
 };
 
 const COUNTRIES = [
@@ -47,7 +52,7 @@ export default function RegisterPage() {
   const [form, setForm] = useState<FormData>(EMPTY);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
   const [showConfirmPwd, setShowConfirmPwd] = useState(false);
   const router = useRouter();
@@ -69,17 +74,25 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/schools/register", {
+      const extraData = {
+        password: form.password,
+        schoolType: form.schoolType,
+        expectedStudents: form.expectedStudents,
+        establishmentYear: form.establishmentYear,
+        notes: form.notes
+      };
+
+      const res = await fetch("/api/schools/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           schoolName: form.schoolName,
-          adminName: form.adminName,
+          directorName: form.adminName,
           email: form.email,
-          password: form.password,
           phone: form.phone,
           city: form.city,
           country: form.country,
+          notes: JSON.stringify(extraData),
         }),
       });
 
@@ -89,7 +102,7 @@ export default function RegisterPage() {
         return;
       }
 
-      setSuccess(true);
+      setSubmitted(true);
       setTimeout(() => router.replace("/login"), 3500);
 
     } catch (err) {
@@ -101,7 +114,7 @@ export default function RegisterPage() {
   };
 
   // ─── شاشة النجاح ──────────────────────────────────────────────────
-  if (success) {
+  if (submitted) {
     return (
       <div style={styles.page} dir="rtl">
         <motion.div
@@ -112,16 +125,13 @@ export default function RegisterPage() {
           <div style={styles.successIcon}>
             <CheckCircle2 size={52} color="#ffffff" />
           </div>
-          <h1 style={styles.successTitle}>تم التسجيل بنجاح! 🎉</h1>
+          <h1 style={styles.successTitle}>تم إرسال طلبك بنجاح 🎉</h1>
           <p style={styles.successText}>
-            تم إنشاء حساب مدرستك. يمكنك تسجيل الدخول الآن وبدء إدارة طلابك.
+            سيتم مراجعة طلبك من قبل إدارة المنصة في أقرب وقت. سيتم التواصل معك عبر الواتساب أو البريد الإلكتروني الذي أدخلته لتأكيد التفعيل، لذا يرجى التأكد من أن بريدك الإلكتروني يعمل.
           </p>
-          <p style={{ color: "#6b7280", fontSize: 14, marginBottom: 28 }}>
-            سيتم توجيهك لصفحة الدخول تلقائياً...
-          </p>
-          <Link href="/login" style={styles.btnPrimary}>
-            دخول لوحة التحكم الآن
-          </Link>
+          <button onClick={() => router.replace("/")} style={styles.btnPrimary}>
+            العودة للرئيسية
+          </button>
         </motion.div>
       </div>
     );
@@ -206,8 +216,8 @@ export default function RegisterPage() {
                 <School size={24} color="#ffffff" />
               </div>
               <div>
-                <h2 style={styles.cardTitle}>تسجيل مدرسة جديدة</h2>
-                <p style={styles.cardSubtitle}>أنشئ حسابك الآن — لا يحتاج موافقة مسبقة</p>
+                <h2 style={styles.cardTitle}>طلب الانضمام للمنصة</h2>
+                <p style={styles.cardSubtitle}>يرجى تعبئة البيانات ليتم مراجعة طلبك والموافقة عليه</p>
               </div>
             </div>
 
@@ -264,6 +274,51 @@ export default function RegisterPage() {
                     />
                   </div>
                 </div>
+
+                <div style={styles.row}>
+                  <div style={{ flex: 1, position: "relative" }}>
+                    <div style={styles.inputIcon}><BookOpen size={18} color="#6b7280" /></div>
+                    <select
+                      value={form.schoolType}
+                      onChange={e => set("schoolType", e.target.value)}
+                      style={{ ...styles.input, appearance: "none" }}
+                    >
+                      <option value="مسجد / حلقة تابعة لمسجد">مسجد / حلقة تابعة لمسجد</option>
+                      <option value="مدرسة قرآنية مستقلة">مدرسة قرآنية مستقلة</option>
+                      <option value="جمعية خيرية / دينية">جمعية خيرية / دينية</option>
+                      <option value="مقرأة إلكترونية (أونلاين)">مقرأة إلكترونية (أونلاين)</option>
+                    </select>
+                  </div>
+                  <div style={{ flex: 1, position: "relative" }}>
+                    <div style={styles.inputIcon}><User size={18} color="#6b7280" /></div>
+                    <select
+                      value={form.expectedStudents}
+                      onChange={e => set("expectedStudents", e.target.value)}
+                      style={{ ...styles.input, appearance: "none" }}
+                    >
+                      <option value="أقل من 50 طالباً">أقل من 50 طالباً</option>
+                      <option value="من 50 إلى 200 طالباً">من 50 إلى 200 طالباً</option>
+                      <option value="أكثر من 200 طالباً">أكثر من 200 طالباً</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <InputField
+                  icon={<Calendar size={18} color="#6b7280" />}
+                  value={form.establishmentYear}
+                  onChange={v => set("establishmentYear", v)}
+                  placeholder="سنة التأسيس / بدء النشاط (اختياري)"
+                  type="number"
+                />
+                
+                <div style={{ position: "relative" }}>
+                  <textarea
+                    value={form.notes}
+                    onChange={e => set("notes", e.target.value)}
+                    placeholder="نبذة مختصرة عن المدرسة ومجال نشاطها..."
+                    style={{ ...styles.input, height: 80, paddingTop: 12, paddingBottom: 12, resize: "none" }}
+                  />
+                </div>
               </div>
 
               {/* ─── قسم المدير ─── */}
@@ -284,7 +339,7 @@ export default function RegisterPage() {
                   icon={<Mail size={18} color="#6b7280" />}
                   value={form.email}
                   onChange={v => set("email", v)}
-                  placeholder="البريد الإلكتروني (للدخول) *"
+                  placeholder="admin@school.com (يرجى إدخال بريد يعمل للتواصل)"
                   type="email"
                   required
                   dir="ltr"

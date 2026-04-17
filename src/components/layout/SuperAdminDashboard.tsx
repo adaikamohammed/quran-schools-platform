@@ -18,10 +18,15 @@ import SchoolsRegistrationChart from "../analytics/SchoolsRegistrationChart";
 
 interface PlatformStats {
   totalSchools: number;
+  schoolsGrowth: string;
   pendingRequests: number;
+  requestsGrowth: string;
   totalTeachers: number;
+  teachersGrowth: string;
   totalStudents: number;
+  studentsGrowth: string;
   totalGroups: number;
+  groupsGrowth: string;
   recentSchools: RecentSchool[];
 }
 
@@ -53,10 +58,10 @@ interface RecentSchool {
 // ─── بطاقة KPI ─────────────────────────────────────────────
 
 function KpiCard({
-  label, value, icon: Icon, color, href, delay = 0, sublabel,
+  label, value, icon: Icon, color, href, delay = 0, sublabel, growth
 }: {
   label: string; value: number | string; icon: React.ElementType;
-  color: string; href: string; delay?: number; sublabel?: string;
+  color: string; href: string; delay?: number; sublabel?: string; growth?: string;
 }) {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay, duration: 0.4 }}>
@@ -66,11 +71,17 @@ function KpiCard({
           <Icon className="w-6 h-6 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-2xl font-black text-gray-900" style={{ fontFamily: "var(--font-headline)" }}>{value}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-2xl font-black text-gray-900" style={{ fontFamily: "var(--font-headline)" }}>{value}</p>
+            {growth && (
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${growth.startsWith('+') ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                {growth}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-gray-500 font-medium">{label}</p>
           {sublabel && <p className="text-xs text-gray-400 mt-0.5">{sublabel}</p>}
         </div>
-        <ArrowLeft className="w-4 h-4 text-gray-300 group-hover:text-[var(--color-primary)] group-hover:-translate-x-1 transition-all" />
       </Link>
     </motion.div>
   );
@@ -161,16 +172,16 @@ export default function SuperAdminDashboard({ displayName }: { displayName?: str
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <KpiCard label="مدرسة مسجلة" value={stats!.totalSchools}
             icon={Building2} color="bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)]"
-            href="/app/schools-admin" delay={0} />
+            href="/app/schools-admin" delay={0} growth={stats!.schoolsGrowth} />
           <KpiCard label="معلمون ومشايخ" value={stats!.totalTeachers}
             icon={Users} color="bg-gradient-to-br from-blue-500 to-blue-700"
-            href="/app/schools-admin" delay={0.08} />
+            href="/app/schools-admin" delay={0.08} growth={stats!.teachersGrowth} />
           <KpiCard label="طلاب في المنصة" value={stats!.totalStudents}
             icon={BookOpen} color="bg-gradient-to-br from-emerald-500 to-emerald-700"
-            href="/app/schools-admin" delay={0.16} />
+            href="/app/schools-admin" delay={0.16} growth={stats!.studentsGrowth} />
           <KpiCard label="أفواج وحلقات" value={stats!.totalGroups || 0}
             icon={Users} color="bg-gradient-to-br from-purple-500 to-purple-700"
-            href="/app/schools-admin" delay={0.20} />
+            href="/app/schools-admin" delay={0.20} growth={stats!.groupsGrowth} />
           <KpiCard
             label="طلبات قيد الانتظار"
             value={stats!.pendingRequests}
@@ -180,6 +191,7 @@ export default function SuperAdminDashboard({ displayName }: { displayName?: str
               : "bg-gradient-to-br from-gray-400 to-gray-500"}
             href="/app/school-requests"
             delay={0.24}
+            growth={stats!.requestsGrowth}
             sublabel={stats!.pendingRequests > 0 ? "تحتاج مراجعة" : "لا توجد طلبات"}
           />
         </div>
@@ -189,7 +201,7 @@ export default function SuperAdminDashboard({ displayName }: { displayName?: str
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
         <h3 className="text-sm font-black text-gray-500 uppercase tracking-wider mb-4"
           style={{ fontFamily: "var(--font-headline)" }}>إجراءات سريعة</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             {
               label: "مراجعة طلبات المدارس",
@@ -208,26 +220,41 @@ export default function SuperAdminDashboard({ displayName }: { displayName?: str
               color: "from-[var(--color-primary)] to-[var(--color-primary-dark)]",
               badge: null,
             },
+            {
+              label: "المستخدمون النشطون اليوم",
+              desc: "متابعة النشاط اللحظي",
+              icon: Users,
+              href: "/app/schools-admin",
+              color: "from-emerald-500 to-emerald-700",
+              badge: "لايف 🟢",
+            },
+            {
+              label: "إحصاءات المنصة",
+              desc: "تقارير ونمو المنصة",
+              icon: AlertCircle,
+              href: "#",
+              color: "from-purple-500 to-indigo-600",
+              badge: null,
+            },
           ].map((action, i) => (
             <motion.div key={i} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.35 + i * 0.07 }}>
               <Link href={action.href}
-                className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-[var(--color-border)] hover:shadow-lg hover:border-[var(--color-primary)]/20 transition-all duration-300 group">
-                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${action.color} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform shadow-md`}>
-                  <action.icon className="w-6 h-6 text-white" />
+                className="flex flex-col gap-3 p-4 bg-white rounded-2xl border border-[var(--color-border)] hover:shadow-md hover:border-[var(--color-primary)]/30 transition-all duration-300 group h-full relative overflow-hidden">
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${action.color} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform shadow-sm`}>
+                  <action.icon className="w-5 h-5 text-white" />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1">
                   <p className="text-sm font-black text-gray-800" style={{ fontFamily: "var(--font-headline)" }}>
                     {action.label}
                   </p>
-                  <p className="text-xs text-gray-400 mt-0.5">{action.desc}</p>
+                  <p className="text-[10px] text-gray-400 mt-1">{action.desc}</p>
                 </div>
                 {action.badge && (
-                  <span className="text-[10px] font-black bg-red-500 text-white px-2 py-1 rounded-full shrink-0">
+                  <span className="absolute top-4 left-4 text-[9px] font-black bg-red-500 text-white px-2 py-0.5 rounded-full">
                     {action.badge}
                   </span>
                 )}
-                <ArrowLeft className="w-4 h-4 text-gray-300 group-hover:text-[var(--color-primary)] group-hover:-translate-x-1 transition-all shrink-0" />
               </Link>
             </motion.div>
           ))}
@@ -243,21 +270,32 @@ export default function SuperAdminDashboard({ displayName }: { displayName?: str
               <Globe className="w-5 h-5 text-[var(--color-primary)]" />
               أكثر البلدان نشاطاً
             </h3>
-            <div className="space-y-3">
-              {Object.entries(
-                analytics.reduce((acc, s) => {
-                  acc[s.country] = (acc[s.country] || 0) + 1;
-                  return acc;
-                }, {} as Record<string, number>)
-              ).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([country, count], i) => (
-                <div key={country} className="flex items-center justify-between pb-3 border-b border-gray-50 last:border-0 last:pb-0">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold shrink-0">{i + 1}</div>
-                    <span className="font-bold text-sm text-gray-700">{country}</span>
+            <div className="space-y-4">
+              {(() => {
+                const countryCounts = Object.entries(
+                  analytics.reduce((acc, s) => {
+                    acc[s.country] = (acc[s.country] || 0) + 1;
+                    return acc;
+                  }, {} as Record<string, number>)
+                ).sort((a, b) => b[1] - a[1]);
+                
+                const topTotal = countryCounts.slice(0, 5).reduce((sum, curr) => sum + curr[1], 0);
+
+                return countryCounts.slice(0, 5).map(([country, count], i) => (
+                  <div key={country}>
+                    <div className="flex items-center justify-between mb-1.5 text-xs">
+                      <span className="font-bold text-gray-700">{country}</span>
+                      <span className="font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{count} مدرسة</span>
+                    </div>
+                    <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }} animate={{ width: `${(count / topTotal) * 100}%` }} transition={{ duration: 0.8, delay: 0.5 + (i * 0.1) }}
+                        className="h-full bg-indigo-400" 
+                      />
+                    </div>
                   </div>
-                  <span className="text-xs font-black bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full">{count} مدرسة</span>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
           </div>
 
@@ -265,23 +303,33 @@ export default function SuperAdminDashboard({ displayName }: { displayName?: str
           <div className="bg-white rounded-2xl border border-[var(--color-border)] p-6">
             <h3 className="text-sm font-black text-gray-800 mb-4 flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-emerald-500" />
-              أعلى المدارس التزاماً (آخر 30 يوم)
+              أعلى المدارس التزاماً (تصنيف)
             </h3>
             <div className="space-y-3">
-              {[...analytics].sort((a, b) => b.engagementRate - a.engagementRate).slice(0, 5).map((school, i) => (
-                <div key={school.id} className="flex items-center justify-between pb-3 border-b border-gray-50 last:border-0 last:pb-0">
-                  <div className="flex-1 min-w-0 pr-2">
-                    <p className="font-bold text-sm text-gray-800 truncate">{school.name}</p>
-                    <p className="text-[10px] text-gray-400">آخر نشاط: {school.lastActivity ? new Date(school.lastActivity).toLocaleDateString('ar-DZ') : 'غير متوفر'}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden shrink-0" dir="ltr">
-                      <div className={`h-full ${school.engagementRate > 70 ? 'bg-emerald-500' : school.engagementRate > 30 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${school.engagementRate}%` }} />
+              {[...analytics].sort((a, b) => b.engagementRate - a.engagementRate).slice(0, 5).map((school, i) => {
+                let badge = "";
+                if (i === 0) badge = "🥇 الأولى";
+                else if (i === 1) badge = "🥈 الثانية";
+                else if (i === 2) badge = "🥉 الثالثة";
+                else badge = `#${i+1}`;
+                
+                return (
+                  <div key={school.id} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0 pr-2">
+                      <div className={`w-10 text-center font-black text-xs shrink-0 ${i === 0 ? 'text-yellow-600' : i === 1 ? 'text-gray-500' : i === 2 ? 'text-amber-700' : 'text-gray-400'}`}>
+                        {badge}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-sm text-gray-800 truncate">{school.name}</p>
+                        <p className="text-[10px] text-gray-500">آخر نشاط: {school.lastActivity ? new Date(school.lastActivity).toLocaleDateString('ar-DZ') : 'غير متوفر'}</p>
+                      </div>
                     </div>
-                    <span className="text-xs font-black text-gray-600 shrink-0 min-w-8 text-left">{school.engagementRate}%</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 shrink-0">{school.engagementRate}%</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </motion.div>

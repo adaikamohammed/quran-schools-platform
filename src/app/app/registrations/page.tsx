@@ -1,23 +1,25 @@
 "use client";
 import SchoolGuard from "@/components/layout/SchoolGuard";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getDB, saveRegistration, queueForSync } from "@/lib/storage/db";
-import { createRegistration, updateRegistrationStatus, createStudent, updateStudent } from "@/lib/storage/mutations";
-import type { PreRegistration, PreRegistrationStatus, AppUser, SubscriptionTier, MemorizationAmount, Student, TransferRecord } from "@/lib/types";
+import { createRegistration, updateRegistrationStatus, createStudent } from "@/lib/storage/mutations";
+import type { PreRegistration, PreRegistrationStatus, AppUser, SubscriptionTier, MemorizationAmount, Student } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
-import Modal, { ModalSection } from "@/components/ui/Modal";
+import Modal from "@/components/ui/Modal";
 import {
   UserPlus, Search, Plus, X, Loader2, Send,
   ChevronRight, ChevronLeft, Edit3, LayoutGrid, Table2,
   ArrowUpDown, Phone, MessageSquare, Printer, BarChart3,
   CheckSquare, Settings2, CheckCircle2, Save,
+  TrendingUp, TrendingDown, Kanban, Activity,
+  Users, Award, Calendar, ArrowRight,
 } from "lucide-react";
 import { PhotoPicker } from "@/components/ui/PhotoPicker";
 
 // ─── أنواع ───────────────────────────────────────────────
-type ViewMode = "cards" | "table";
+type ViewMode = "cards" | "table" | "pipeline";
 
 // ─── إعداد الحالات ───────────────────────────────────────
 const STATUS_CFG: Record<
@@ -151,7 +153,7 @@ function LevelPicker({ value, onChange }: { value: string; onChange: (v: string)
 }
 
 // ──────────────────────────────────────────────────────────
-// لوحة الإحصائيات
+// لوحة الإحصائيات البسيطة (قديمة — محفوظة للتوافق)
 // ──────────────────────────────────────────────────────────
 function StatsPanel({ items }: { items: PreRegistration[] }) {
   const total = items.length;
@@ -190,6 +192,350 @@ function StatsPanel({ items }: { items: PreRegistration[] }) {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// لوحة التحليل المتقدم (Analytics Dashboard)
+// ──────────────────────────────────────────────────────────
+
+function MiniSparkline({ values, color = "#10b981" }: { values: number[]; color?: string }) {
+  if (values.length < 2) return null;
+  const max = Math.max(...values, 1);
+  const W = 80; const H = 28;
+  const pts = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * W;
+    const y = H - (v / max) * H;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={parseFloat(pts.split(" ").at(-1)!.split(",")[0])} cy={parseFloat(pts.split(" ").at(-1)!.split(",")[1])} r="3" fill={color} />
+    </svg>
+  );
+}
+
+function AnalyticsDashboard({ all, year }: { all: PreRegistration[]; year: number }) {
+  const yearRegs = useMemo(() => all.filter(r => new Date(r.requestedAt).getFullYear() === year), [all, year]);
+
+  const total = yearRegs.length;
+  const joined = yearRegs.filter(r => r.status === "تم الإنضمام").length;
+  const rejected = yearRegs.filter(r => r.status === "مرفوض").length;
+  const pending = yearRegs.filter(r => ["مرشح", "تم الإتصال", "مؤجل"].includes(r.status)).length;
+  const acceptanceRate = total > 0 ? Math.round((joined / total) * 100) : 0;
+  const dropRate = total > 0 ? Math.round(((rejected) / total) * 100) : 0;
+
+  // بيانات شهرية
+  const monthlyData = useMemo(() => {
+    const months = Array.from({ length: 12 }, (_, i) => ({
+      month: i,
+      label: ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"][i].slice(0,3),
+      total: 0, joined: 0, rejected: 0,
+    }));
+    yearRegs.forEach(r => {
+      const m = new Date(r.requestedAt).getMonth();
+      months[m].total++;
+      if (r.status === "تم الإنضمام") months[m].joined++;
+      if (r.status === "مرفوض") months[m].rejected++;
+    });
+    return months;
+  }, [yearRegs]);
+
+  const maxMonth = Math.max(...monthlyData.map(m => m.total), 1);
+  const activeMonths = monthlyData.filter(m => m.total > 0);
+  const sparkValues = monthlyData.map(m => m.total);
+
+  // توزيع المستويات
+  const levelGroups = useMemo(() => {
+    const map: Record<string, number> = {};
+    yearRegs.forEach(r => {
+      const key = r.educationalLevel || "غير محدد";
+      map[key] = (map[key] || 0) + 1;
+    });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  }, [yearRegs]);
+
+  // توزيع الجنس
+  const male = yearRegs.filter(r => r.gender === "ذكر").length;
+  const female = yearRegs.filter(r => r.gender === "أنثى").length;
+
+  const PIPELINE_STEPS: { key: PreRegistrationStatus; label: string; color: string }[] = [
+    { key: "مرشح",        label: "مرشح",      color: "#7c3aed" },
+    { key: "تم الإتصال",  label: "تم الاتصال",color: "#2563eb" },
+    { key: "مؤجل",        label: "مؤجل",      color: "#d97706" },
+    { key: "تم الإنضمام", label: "انضم",       color: "#059669" },
+    { key: "مرفوض",       label: "مرفوض",     color: "#dc2626" },
+  ];
+
+  if (total === 0) return (
+    <div className="bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] p-8 text-center">
+      <Activity className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+      <p className="text-gray-400 font-medium">لا توجد بيانات لعام {year}</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* KPIs */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "إجمالي المرشحين",  value: total,          icon: Users,      color: "from-slate-500 to-slate-700",   sub: `${year}` },
+          { label: "معدل القبول",       value: `${acceptanceRate}%`, icon: Award, color: "from-emerald-500 to-green-600", sub: `${joined} انضم` },
+          { label: "قيد المتابعة",     value: pending,        icon: Calendar,   color: "from-amber-500 to-orange-500",  sub: "مرشح+اتصال+مؤجل" },
+          { label: "نسبة الانسحاب",    value: `${dropRate}%`, icon: TrendingDown,color: "from-red-500 to-rose-600",     sub: `${rejected} مرفوض` },
+        ].map(({ label, value, icon: Icon, color, sub }) => (
+          <motion.div key={label}
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] p-4 relative overflow-hidden">
+            <div className={`absolute top-0 right-0 w-20 h-20 rounded-full bg-gradient-to-br ${color} opacity-5 -translate-y-6 translate-x-6`} />
+            <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center mb-2 shadow-sm`}>
+              <Icon className="w-4 h-4 text-white" />
+            </div>
+            <p className="text-xl font-black text-gray-900 dark:text-white" style={{ fontFamily: "var(--font-headline)" }}>{value}</p>
+            <p className="text-xs font-bold text-gray-500 dark:text-gray-400">{label}</p>
+            <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-0.5">{sub}</p>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* رسم بياني شهري + pipeline */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* رسم شهري */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+          className="lg:col-span-2 bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-[var(--color-primary)]" />
+              <h3 className="text-sm font-black text-gray-800 dark:text-white">التسجيلات الشهرية</h3>
+            </div>
+            <div className="flex items-center gap-3">
+              {activeMonths.length >= 2 && <MiniSparkline values={sparkValues} color="var(--color-primary)" />}
+              <div className="flex items-center gap-3 text-[10px] text-gray-400">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[var(--color-primary)] inline-block" />إجمالي</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />انضم</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-end gap-1 h-28">
+            {monthlyData.map((m, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                <div className="w-full flex flex-col justify-end gap-0.5" style={{ height: 80 }}>
+                  {m.total > 0 && (
+                    <div className="relative w-full">
+                      <motion.div
+                        initial={{ height: 0 }}
+                        animate={{ height: `${Math.round((m.total / maxMonth) * 72)}px` }}
+                        transition={{ delay: i * 0.04, duration: 0.4 }}
+                        className="w-full bg-[var(--color-primary)] rounded-t-md opacity-80 relative"
+                      >
+                        {m.joined > 0 && (
+                          <motion.div
+                            initial={{ height: 0 }}
+                            animate={{ height: `${Math.round((m.joined / m.total) * 100)}%` }}
+                            transition={{ delay: i * 0.04 + 0.3, duration: 0.3 }}
+                            className="absolute bottom-0 left-0 right-0 bg-emerald-400 rounded-t-md"
+                          />
+                        )}
+                      </motion.div>
+                    </div>
+                  )}
+                  {m.total === 0 && <div className="w-full" style={{ height: 4, background: 'rgba(0,0,0,0.05)', borderRadius: 2 }} />}
+                </div>
+                <span className="text-[9px] font-bold text-gray-400">{m.label}</span>
+                {m.total > 0 && <span className="text-[9px] font-black text-gray-600">{m.total}</span>}
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* توزيع الجنس + القبول */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+          className="bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] p-5 space-y-4">
+          <h3 className="text-sm font-black text-gray-800 dark:text-white flex items-center gap-2">
+            <Users className="w-4 h-4 text-pink-500" /> توزيع المرشحين
+          </h3>
+          {/* الجنس */}
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">الجنس</p>
+            <div className="flex h-3 rounded-full overflow-hidden gap-0.5">
+              <motion.div initial={{ width: 0 }} animate={{ width: `${total > 0 ? (male/total)*100 : 50}%` }}
+                transition={{ duration: 0.6 }} className="bg-blue-400 rounded-r-full" />
+              <motion.div initial={{ width: 0 }} animate={{ width: `${total > 0 ? (female/total)*100 : 50}%` }}
+                transition={{ duration: 0.6 }} className="bg-pink-400 rounded-l-full" />
+            </div>
+            <div className="flex justify-between mt-1.5">
+              <span className="text-[10px] font-bold text-blue-600">👦 {male} ذكر ({total>0?Math.round(male/total*100):0}%)</span>
+              <span className="text-[10px] font-bold text-pink-500">👧 {female} أنثى ({total>0?Math.round(female/total*100):0}%)</span>
+            </div>
+          </div>
+          {/* pipeline */}
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Pipeline القبول</p>
+            <div className="space-y-1.5">
+              {PIPELINE_STEPS.map(step => {
+                const cnt = yearRegs.filter(r => r.status === step.key).length;
+                const pct = total > 0 ? Math.round((cnt / total) * 100) : 0;
+                return (
+                  <div key={step.key} className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-500 w-16 shrink-0 truncate">{step.label}</span>
+                    <div className="flex-1 h-2 bg-gray-100 dark:bg-white/10 rounded-full overflow-hidden">
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }}
+                        transition={{ duration: 0.5 }}
+                        className="h-full rounded-full" style={{ background: step.color }} />
+                    </div>
+                    <span className="text-[10px] font-black w-6 text-left" style={{ color: step.color }}>{cnt}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* توزيع المستويات الدراسية */}
+      {levelGroups.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+          className="bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] p-5">
+          <h3 className="text-sm font-black text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+            <Activity className="w-4 h-4 text-indigo-500" /> توزيع المستويات الدراسية
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {levelGroups.map(([level, cnt]) => {
+              const pct = total > 0 ? Math.round((cnt / total) * 100) : 0;
+              return (
+                <div key={level} className="bg-indigo-50 dark:bg-indigo-500/10 rounded-xl p-3 text-center">
+                  <p className="text-lg font-black text-indigo-700 dark:text-indigo-300">{cnt}</p>
+                  <p className="text-[10px] font-bold text-indigo-500 truncate">{level}</p>
+                  <p className="text-[10px] text-indigo-300">{pct}%</p>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Pipeline / Kanban View
+// ──────────────────────────────────────────────────────────
+const PIPELINE_COLUMNS: { key: PreRegistrationStatus; label: string; color: string; bg: string; border: string }[] = [
+  { key: "مرشح",         label: "⭐ مرشح",       color: "text-purple-700", bg: "bg-purple-50 dark:bg-purple-500/10",   border: "border-purple-200 dark:border-purple-500/30" },
+  { key: "تم الإتصال",   label: "📞 تم الاتصال", color: "text-blue-700",   bg: "bg-blue-50 dark:bg-blue-500/10",     border: "border-blue-200 dark:border-blue-500/30"   },
+  { key: "مؤجل",         label: "⏰ مؤجل",        color: "text-amber-700",  bg: "bg-amber-50 dark:bg-amber-500/10",   border: "border-amber-200 dark:border-amber-500/30" },
+  { key: "تم الإنضمام",  label: "✅ انضم",        color: "text-emerald-700",bg: "bg-emerald-50 dark:bg-emerald-500/10",border: "border-emerald-200 dark:border-emerald-500/30"},
+  { key: "مرفوض",        label: "❌ مرفوض",       color: "text-red-600",    bg: "bg-red-50 dark:bg-red-500/10",       border: "border-red-200 dark:border-red-500/30"     },
+];
+
+function PipelineCard({ reg, onStatusModal, onEditModal, updating }: {
+  reg: PreRegistration;
+  onStatusModal: (r: PreRegistration) => void;
+  onEditModal: (r: PreRegistration) => void;
+  updating: string | null;
+}) {
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="bg-white dark:bg-[var(--color-card)] rounded-xl border border-[var(--color-border)] p-3 shadow-sm hover:shadow-md transition-shadow"
+    >
+      <div className="flex items-start gap-2 mb-2">
+        <div className={`w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-white text-xs font-black ${
+          reg.gender === "أنثى" ? "bg-gradient-to-br from-pink-400 to-rose-500" : "bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)]"
+        }`}>{reg.fullName[0]}</div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-black text-gray-800 dark:text-white truncate">{reg.fullName}</p>
+          <p className="text-[10px] text-gray-400">{reg.gender} {reg.educationalLevel ? `· ${reg.educationalLevel}` : ""}</p>
+        </div>
+      </div>
+      {reg.phone1 && (
+        <p className="text-[10px] text-gray-400 mb-2 font-mono" dir="ltr">{reg.phone1}</p>
+      )}
+      {reg.notes && (
+        <p className="text-[10px] text-gray-500 bg-gray-50 dark:bg-white/5 rounded-lg px-2 py-1.5 mb-2 line-clamp-2">💬 {reg.notes}</p>
+      )}
+      <p className="text-[10px] text-gray-300 dark:text-gray-600 mb-2">📅 {new Date(reg.requestedAt).toLocaleDateString("ar-DZ")}</p>
+      <div className="flex gap-1">
+        <button onClick={() => onStatusModal(reg)} disabled={updating === reg.id}
+          className="flex-1 py-1 rounded-lg text-[10px] font-bold bg-[var(--color-primary-light)] text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 transition-colors">
+          {updating === reg.id ? "..." : "تغيير ←"}
+        </button>
+        <button onClick={() => onEditModal(reg)}
+          className="flex-1 py-1 rounded-lg text-[10px] font-bold bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 hover:bg-indigo-100 transition-colors">
+          تعديل
+        </button>
+        <a href={`https://wa.me/${reg.phone1.replace(/\s/g, "").replace(/^0/, "213")}`} target="_blank" rel="noreferrer"
+          className="flex-1 py-1 rounded-lg text-[10px] font-bold bg-green-50 dark:bg-green-500/10 text-green-600 hover:bg-green-100 transition-colors text-center">
+          واتساب
+        </a>
+      </div>
+    </motion.div>
+  );
+}
+
+function PipelineView({ items, onStatusModal, onEditModal, updating }: {
+  items: PreRegistration[];
+  onStatusModal: (r: PreRegistration) => void;
+  onEditModal: (r: PreRegistration) => void;
+  updating: string | null;
+}) {
+  return (
+    <div className="overflow-x-auto pb-4">
+      <div className="flex gap-3 min-w-max">
+        {PIPELINE_COLUMNS.map(col => {
+          const colItems = items.filter(r => r.status === col.key);
+          return (
+            <div key={col.key} className="w-56 shrink-0">
+              {/* رأس العمود */}
+              <div className={`flex items-center justify-between px-3 py-2 rounded-xl mb-2 border ${col.bg} ${col.border}`}>
+                <p className={`text-xs font-black ${col.color}`}>{col.label}</p>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full bg-white/60 ${col.color}`}>{colItems.length}</span>
+              </div>
+              {/* البطاقات */}
+              <div className="space-y-2">
+                <AnimatePresence>
+                  {colItems.length === 0 ? (
+                    <div className="border-2 border-dashed border-gray-200 dark:border-white/10 rounded-xl p-4 text-center">
+                      <p className="text-[10px] text-gray-300 dark:text-gray-600">لا يوجد</p>
+                    </div>
+                  ) : (
+                    colItems.map(reg => (
+                      <PipelineCard key={reg.id} reg={reg} onStatusModal={onStatusModal} onEditModal={onEditModal} updating={updating} />
+                    ))
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* عمود "مدرسة أخرى" + "مكرر" + "لم يرد" */}
+        {(["إنضم لمدرسة أخرى", "مكرر", "لم يرد"] as PreRegistrationStatus[]).map(key => {
+          const colItems = items.filter(r => r.status === key);
+          if (colItems.length === 0) return null;
+          const cfg = STATUS_CFG[key];
+          return (
+            <div key={key} className="w-56 shrink-0">
+              <div className={`flex items-center justify-between px-3 py-2 rounded-xl mb-2 border ${cfg.bg} ${cfg.border}`}>
+                <p className={`text-xs font-black ${cfg.color}`}>{cfg.emoji} {cfg.label}</p>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full bg-white/60 ${cfg.color}`}>{colItems.length}</span>
+              </div>
+              <div className="space-y-2">
+                {colItems.map(reg => (
+                  <PipelineCard key={reg.id} reg={reg} onStatusModal={onStatusModal} onEditModal={onEditModal} updating={updating} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1067,7 +1413,7 @@ function RegistrationsPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <YearPicker value={filterYear} onChange={setFilterYear} />
           {/* تبديل العرض */}
-          <div className="flex items-center bg-white border border-gray-200 rounded-2xl p-1 gap-1">
+          <div className="flex items-center bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-1 gap-1">
             <button onClick={() => setViewMode("cards")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all ${viewMode === "cards" ? "bg-[var(--color-primary)] text-white shadow-sm" : "text-gray-500 hover:bg-gray-100"}`}>
               <LayoutGrid className="w-3.5 h-3.5" /> بطاقات
@@ -1076,15 +1422,19 @@ function RegistrationsPage() {
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all ${viewMode === "table" ? "bg-[var(--color-primary)] text-white shadow-sm" : "text-gray-500 hover:bg-gray-100"}`}>
               <Table2 className="w-3.5 h-3.5" /> جدول
             </button>
+            <button onClick={() => setViewMode("pipeline")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all ${viewMode === "pipeline" ? "bg-[var(--color-primary)] text-white shadow-sm" : "text-gray-500 hover:bg-gray-100"}`}>
+              <Kanban className="w-3.5 h-3.5" /> Pipeline
+            </button>
           </div>
-          {/* إحصائيات */}
+          {/* تحليل متقدم */}
           <button onClick={() => setShowStats((s) => !s)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black border transition-all ${showStats ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"}`}>
-            <BarChart3 className="w-3.5 h-3.5" /> إحصائيات
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black border transition-all ${showStats ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]" : "bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-300"}`}>
+            <BarChart3 className="w-3.5 h-3.5" /> تحليل
           </button>
           {/* طباعة */}
           <button onClick={() => openPrintWindow(filtered, filterLabel, filterYear)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-all">
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-300 transition-all">
             <Printer className="w-3.5 h-3.5" /> طباعة
           </button>
           <button onClick={() => setShowNewModal(true)} className="btn-primary py-2.5 text-sm shrink-0">
@@ -1108,12 +1458,12 @@ function RegistrationsPage() {
         ))}
       </div>
 
-      {/* ── لوحة الإحصائيات التفصيلية ── */}
+      {/* ── لوحة التحليل المتقدم ── */}
       <AnimatePresence>
         {showStats && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-            <StatsPanel items={filtered} />
+            <AnalyticsDashboard all={registrations} year={filterYear} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -1143,6 +1493,8 @@ function RegistrationsPage() {
           <UserPlus className="w-12 h-12 text-gray-200 mx-auto mb-3" />
           <p className="text-gray-400 font-medium">{registrations.length === 0 ? "لا يوجد مرشحون بعد" : "لا توجد نتائج لهذا الفلتر"}</p>
         </div>
+      ) : viewMode === "pipeline" ? (
+        <PipelineView items={filtered} onStatusModal={setStatusModal} onEditModal={setEditModal} updating={updating} />
       ) : viewMode === "cards" ? (
         <CardsView items={paginated} updating={updating} onStatusModal={setStatusModal}
           onEditModal={setEditModal} selectedIds={selectedIds} onSelectId={handleSelectId} />

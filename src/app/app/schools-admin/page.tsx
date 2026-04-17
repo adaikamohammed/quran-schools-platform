@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Building2, Plus, Search, Edit, Trash2, X, AlertTriangle, CheckCircle2,
-  UserCog, Mail
+  UserCog, Mail, Activity, MapPin, Calendar, Clock, Trophy
 } from "lucide-react";
 
 const supabase = createClient();
@@ -23,6 +23,11 @@ function SchoolModal({
   onSave: (s: any, p: any) => Promise<void>;
   onClose: () => void;
 }) {
+  // Calculate a mock subscription end date (1 year from now, or based on school creation if we had it)
+  // Since we don't have it natively in this schema snippet, we simulate it
+  const mockSubEnd = new Date();
+  mockSubEnd.setMonth(mockSubEnd.getMonth() + 3);
+
   const [form, setForm] = useState({
     name: school?.name || "",
     city: school?.city || "",
@@ -32,9 +37,14 @@ function SchoolModal({
     principalPassword: "",
     principalPhone: principal?.phone || "",
     status: school?.status || "نشطة",
+    subscriptionEndDate: school?.subscriptionEndDate || mockSubEnd.toISOString().split("T")[0],
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const daysToExpiry = Math.ceil((new Date(form.subscriptionEndDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
+  const isExpiringSoon = daysToExpiry <= 7 && daysToExpiry > 0;
+  const isExpired = daysToExpiry <= 0;
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.principalName.trim() || !form.principalEmail.trim() || (!principal && !form.principalPassword)) {
@@ -108,9 +118,29 @@ function SchoolModal({
                     placeholder="مدرسة الفرقان" className="input-field py-2.5 mt-1.5 text-sm" />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
+                  <label className="label-xs">الدولة</label>
+                  <input type="text" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })}
+                    placeholder="الجزائر" className="input-field py-2.5 mt-1.5 text-sm" />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
                   <label className="label-xs">المدينة / الولاية</label>
                   <input type="text" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })}
                     placeholder="الجزائر العاصمة" className="input-field py-2.5 mt-1.5 text-sm" />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="label-xs">حالة الحساب</label>
+                  <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}
+                    className="input-field py-2.5 mt-1.5 text-sm">
+                    <option value="نشطة">نشطة</option>
+                    <option value="موقوفة">موقوفة</option>
+                  </select>
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="label-xs">تاريخ انتهاء الاشتراك</label>
+                  <input type="date" value={form.subscriptionEndDate} onChange={(e) => setForm({ ...form, subscriptionEndDate: e.target.value })}
+                    className={`input-field py-2.5 mt-1.5 text-sm text-left ${isExpired ? 'border-red-500 text-red-600 bg-red-50' : isExpiringSoon ? 'border-amber-500 text-amber-600 bg-amber-50' : ''}`} dir="ltr" />
+                  {isExpired && <p className="text-[10px] text-red-500 mt-1 font-bold">الاشتراك منتهي!</p>}
+                  {isExpiringSoon && <p className="text-[10px] text-amber-600 mt-1 font-bold">ينتهي بعد {daysToExpiry} أيام</p>}
                 </div>
               </div>
             </div>
@@ -164,6 +194,8 @@ export default function SchoolsAdminPage() {
   const [schools, setSchools] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [filterCountry, setFilterCountry] = useState("الكل");
+  const [filterStatus, setFilterStatus] = useState("الكل");
   
   const [editingItem, setEditingItem] = useState<any>(undefined);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -200,12 +232,19 @@ export default function SchoolsAdminPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const filtered = schools.filter(s => 
-    !search || 
-    s.school.name.includes(search) || 
-    s.school.city?.includes(search) ||
-    s.principal?.display_name?.includes(search)
-  );
+  const filtered = schools.filter(s => {
+    const matchSearch = !search || 
+      s.school.name.includes(search) || 
+      s.school.city?.includes(search) ||
+      s.principal?.display_name?.includes(search);
+    const matchCountry = filterCountry === "الكل" || s.school.country === filterCountry;
+    const matchStatus = filterStatus === "الكل" || (s.school.status || "نشطة") === filterStatus;
+    
+    return matchSearch && matchCountry && matchStatus;
+  });
+
+  const countries = Array.from(new Set(schools.map(s => s.school.country).filter(Boolean))).sort();
+  const topSchools = [...schools].sort((a, b) => b.stats.engagementRate - a.stats.engagementRate).slice(0, 3);
 
   const handleSave = async (schoolData: any, principalData: any) => {
     if (!editingItem) {
@@ -265,17 +304,54 @@ export default function SchoolsAdminPage() {
         </div>
         
         <button onClick={() => { setEditingItem(undefined); setIsModalOpen(true); }}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2 py-2.5 px-5 rounded-xl font-bold text-sm transition-colors shadow-md">
+          className="bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2 py-2.5 px-5 rounded-xl font-bold text-sm transition-colors shadow-md shrink-0">
           <Plus className="w-4 h-4" /> إضافة مدرسة جديدة
         </button>
       </div>
 
+      {/* ── لوحة أعلى المدارس نمواً / تفاعلاً ── */}
+      {!loading && topSchools.length > 0 && (
+        <div className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-3xl p-5 text-white shadow-md relative overflow-hidden">
+          <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
+          <h2 className="text-sm font-black mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-300" /> المدارس الأكثر نشاطاً هذا الشهر</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {topSchools.map((s, i) => (
+              <div key={s.school.id} className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-black text-lg shadow-sm">
+                  {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-sm truncate">{s.school.name}</p>
+                  <p className="text-xs text-emerald-100 flex items-center gap-1 mt-0.5"><Activity className="w-3.5 h-3.5" /> تفاعل {s.stats.engagementRate}%</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── فلاتر وبحث ── */}
       <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm space-y-5">
-        <div className="relative max-w-sm">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="ابحث باسم المدرسة، المدينة أو المدير..."
-            className="w-full pl-4 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 bg-gray-50/50" />
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="ابحث باسم المدرسة، المدينة أو المدير..."
+              className="w-full pl-4 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 bg-gray-50/50" />
+          </div>
+          <div className="flex gap-3">
+            <select value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)}
+              className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 bg-gray-50/50 focus:outline-none focus:border-indigo-500 min-w-[120px]">
+              <option value="الكل">كل البلدان</option>
+              {countries.map(c => <option key={c} value={c as string}>{c as string}</option>)}
+            </select>
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 bg-gray-50/50 focus:outline-none focus:border-indigo-500 min-w-[120px]">
+              <option value="الكل">كل الحالات</option>
+              <option value="نشطة">نشطة</option>
+              <option value="موقوفة">موقوفة</option>
+            </select>
+          </div>
         </div>
 
         {loading ? (
@@ -300,7 +376,10 @@ export default function SchoolsAdminPage() {
                       <h3 className="text-base font-black text-gray-900 truncate" title={item.school.name}>
                         {item.school.name}
                       </h3>
-                      <span className="text-xs text-gray-400 font-bold">{[item.school.country, item.school.city].filter(Boolean).join(" - ")}</span>
+                      <span className="text-xs text-gray-400 font-bold flex items-center gap-1 mt-0.5">
+                        <MapPin className="w-3.5 h-3.5" />
+                        {[item.school.country, item.school.city].filter(Boolean).join(" - ")}
+                      </span>
                     </div>
                   </div>
                   
@@ -336,9 +415,17 @@ export default function SchoolsAdminPage() {
                     </div>
                   </div>
                   
-                  <div className="mt-3 text-[10px] text-gray-400 flex items-center justify-between px-1">
-                    <span>التسجيل: {item.stats.createdAt ? new Date(item.stats.createdAt).toLocaleDateString('ar-DZ') : '-'}</span>
-                    <span>النشاط: {item.stats.lastActivity ? new Date(item.stats.lastActivity).toLocaleDateString('ar-DZ') : 'لا يوجد'}</span>
+                  <div className="mt-3 text-[10px] text-gray-400 flex flex-col gap-1.5 px-1 bg-gray-50/50 p-2 rounded-lg border border-gray-50">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-gray-400" /> الانضمام:</span>
+                      <span className="font-bold text-gray-600">{item.stats.createdAt ? new Date(item.stats.createdAt).toLocaleDateString('ar-DZ') : '-'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-emerald-500" /> آخر حصة مُسجلة:</span>
+                      <span className="font-bold text-emerald-600">
+                        {item.stats.lastActivity ? new Date(item.stats.lastActivity).toLocaleDateString('ar-DZ', { weekday: 'long', day: 'numeric', month: 'short' }) : 'لا يوجد'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 

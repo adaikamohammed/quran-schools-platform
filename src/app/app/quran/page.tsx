@@ -12,7 +12,7 @@ import {
   BookOpen, BookCheck, Search, ChevronDown,
   Star, TrendingUp, Award, CheckCircle2, Clock,
   Circle, RotateCcw, X, Users, Filter,
-  ChevronRight, Info, Sparkles, Target, Mic2
+  ChevronRight, Info, Sparkles, Target, Mic2, AlertTriangle, Lightbulb
 } from "lucide-react";
 import type { TajweedRule } from "@/lib/types";
 
@@ -310,8 +310,10 @@ function QuranPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [filterStatus, setFilterStatus] = useState<SurahStatus | "الكل">("الكل");
+  const [filterStatus, setFilterStatus] = useState<SurahStatus | "الكل" | "الضعيفة">("الكل");
   const [saving, setSaving] = useState(false);
+  const [annualGoal, setAnnualGoal] = useState<number>(30); // هدف الحفظ السنوي بعدد السور
+  const [showGoalEditor, setShowGoalEditor] = useState(false);
   const [currentTab, setCurrentTab] = useState<"hifz" | "tajweed">("hifz");
 
   const TAJWEED_RULES: TajweedRule[] = [
@@ -400,11 +402,24 @@ function QuranPage() {
     return { memorized, mastered, inProgress, remaining, percent };
   }, [selectedProgress]);
 
+  // ─── السورة الحالية المقترحة (قيد الحفظ) ──────────────────
+  const suggestedNextSurah = useMemo(() => {
+    if (!selectedStudentId) return null;
+    const inProg = surahs.find(s => selectedProgress.get(s.id) === "قيد الحفظ");
+    if (inProg) return inProg;
+    // أول سورة غير محفوظة
+    return surahs.find(s => !selectedProgress.has(s.id) || selectedProgress.get(s.id) === "غير محفوظة") ?? null;
+  }, [selectedProgress, selectedStudentId]);
+
   // ─── فلترة السور ─────────────────────────────────────────
 
   const filteredSurahs = useMemo(() => {
     return surahs.filter((s) => {
       const status = selectedProgress.get(s.id) ?? "غير محفوظة";
+      if (filterStatus === "الضعيفة") {
+        // السور المحفوظة أو قيد الحفظ فقط — لا نعرض غير المحفوظة أو المتقنة
+        return status === "قيد الحفظ" || status === "محفوظة";
+      }
       const matchFilter = filterStatus === "الكل" || status === filterStatus;
       return matchFilter;
     });
@@ -586,6 +601,58 @@ function QuranPage() {
                   />
                 </div>
               </div>
+
+              {/* الهدف السنوي */}
+              <div className="relative z-10 mt-3 pt-3 border-t border-white/20">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <Target className="w-3.5 h-3.5 text-white/70" />
+                    <span className="text-[11px] text-white/70 font-bold">الهدف السنوي</span>
+                  </div>
+                  <button
+                    onClick={() => setShowGoalEditor(v => !v)}
+                    className="text-[10px] text-white/60 hover:text-white transition-colors font-bold underline"
+                  >
+                    {annualGoal} سورة · تعديل
+                  </button>
+                </div>
+                <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-amber-300 rounded-full transition-all duration-700"
+                    style={{ width: `${Math.min(100, Math.round((stats.memorized / annualGoal) * 100))}%` }}
+                  />
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span className="text-[10px] text-white/50">{stats.memorized} / {annualGoal} سورة</span>
+                  <span className="text-[10px] text-amber-300 font-bold">{Math.min(100, Math.round((stats.memorized / annualGoal) * 100))}% من الهدف</span>
+                </div>
+                {showGoalEditor && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      type="range" min={5} max={114} value={annualGoal}
+                      onChange={e => setAnnualGoal(+e.target.value)}
+                      className="flex-1 accent-amber-300"
+                    />
+                    <span className="text-xs text-white font-black w-8 text-center">{annualGoal}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* اقتراح السورة التالية */}
+              {suggestedNextSurah && (
+                <div className="relative z-10 mt-3 pt-3 border-t border-white/20 flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4 text-amber-300 shrink-0" />
+                  <div className="flex-1">
+                    <span className="text-[11px] text-white/60">السورة التالية المقترحة: </span>
+                    <button
+                      onClick={() => setSelectedSurah(suggestedNextSurah)}
+                      className="text-[11px] font-black text-amber-300 hover:text-amber-200 transition-colors hover:underline"
+                    >
+                      {suggestedNextSurah.name} ({suggestedNextSurah.verses} آية) ←
+                    </button>
+                  </div>
+                </div>
+              )}
             </motion.div>
 
             {/* مفتاح الألوان + فلاتر */}
@@ -609,6 +676,18 @@ function QuranPage() {
                     </button>
                   );
                 })}
+                {/* زر السور الضعيفة */}
+                <button
+                  onClick={() => setFilterStatus(filterStatus === "الضعيفة" ? "الكل" : "الضعيفة")}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-all ${
+                    filterStatus === "الضعيفة"
+                      ? "bg-orange-50 border-orange-300 text-orange-700 shadow-sm"
+                      : "bg-white border-gray-200 text-gray-500 hover:border-orange-200"
+                  }`}
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  تحتاج مراجعة
+                </button>
                 {filterStatus !== "الكل" && (
                   <button
                     onClick={() => setFilterStatus("الكل")}

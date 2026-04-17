@@ -115,6 +115,12 @@ function ReportCard({
                   📌 مثبّت
                 </span>
               )}
+              {/* رد جديد من الإدارة */}
+              {report.adminNotes && report.status === "reviewed" && (
+                <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  🔔 رد من الإدارة
+                </span>
+              )}
             </div>
             <p className="text-xs text-gray-400 font-medium mt-1">
               {formatDate(report.timestamp)} · {formatTime(report.timestamp)}
@@ -209,6 +215,14 @@ function NewReportModal({
   const [priority, setPriority] = useState<"normal" | "important" | "urgent">("normal");
   const [saving, setSaving] = useState(false);
 
+  const TEMPLATES = [
+    { label: "غياب طالب",    cat: "غياب طالب",    priority: "normal"    as const, text: "لم يحضر هذا اليوم الطالب [ اسم الطالب ] ولم تصل أي خبر من ولي الأمر." },
+    { label: "مشكلة سلوكية", cat: "مشكلة سلوكية", priority: "important" as const, text: "أبدى الطالب [ اسم ] تصرفاً غير لائق خلال الحصة. يستلزم الأمر متابعة من الإدارة." },
+    { label: "إنجاز حفظ",   cat: "إنجاز حفظ",   priority: "normal"    as const, text: "أتم الطالب [ اسم ] حفظ سورة [ السورة ] بتميز وإتقان. نسأل الله أن يبارك فيه." },
+    { label: "طلب إداري",   cat: "طلب إداري",   priority: "important" as const, text: "أرجو من الإدارة [ اكتب طلبك هنا ] وذلك في أقرب وقت ممكن." },
+    { label: "ملاحظة صحية", cat: "ملاحظة صحية", priority: "important" as const, text: "أفيد بمرض الطالب [ اسم ] وعدم قدرته على الحضور بشكل منتظم." },
+  ];
+
   const handleSubmit = async () => {
     if (!note.trim()) return;
     setSaving(true);
@@ -256,6 +270,25 @@ function NewReportModal({
           </div>
 
           <div className="p-5 space-y-4">
+            {/* قوالب سريعة */}
+            <div>
+              <label className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2 block">
+                قوالب سريعة
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {TEMPLATES.map((tpl) => (
+                  <button
+                    key={tpl.label}
+                    type="button"
+                    onClick={() => { setNote(tpl.text); setCategory(tpl.cat); setPriority(tpl.priority); }}
+                    className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold border border-gray-200 bg-gray-50 text-gray-600 hover:bg-[var(--color-primary-light)] hover:border-[var(--color-primary)]/30 hover:text-[var(--color-primary)] transition-all"
+                  >
+                    {tpl.label} →
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* التصنيف */}
             <div>
               <label className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2 block">
@@ -543,7 +576,24 @@ function ReportsPage() {
           />
         </div>
 
-        {/* فلاتر */}
+        {/* فلتر الفئة (التصنيف) */}
+        <div className="flex gap-1.5 flex-wrap">
+          {(["الكل", ...CATEGORIES]).map(cat => (
+            <button
+              key={cat}
+              onClick={() => setFilterCategory(cat)}
+              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all ${
+                filterCategory === cat
+                  ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm"
+                  : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* فلاتر الحالة والأولوية */}
         <div className="flex flex-wrap gap-2 items-center">
           {/* الحالة */}
           <div className="flex gap-1.5 flex-wrap">

@@ -80,6 +80,11 @@ async function performSync(): Promise<void> {
     });
 
     if (!res.ok) {
+      if (res.status === 401) {
+        console.warn("[SyncEngine] Push sync skipped: User is not authenticated (401).");
+        isCurrentlySyncing = false;
+        return;
+      }
       throw new Error(`Sync failed with status: ${res.status}`);
     }
 
@@ -126,6 +131,9 @@ async function performSync(): Promise<void> {
 // ─── منطق سحب البيانات (Pull) من السحابة ─────────────────
 
 export async function pullSync(): Promise<void> {
+  // لا تحاول المزامنة عند عدم وجود الاتصال
+  if (!navigator.onLine) return;
+
   const status = getCurrentSyncStatus();
   const lastSyncAt = status.lastSyncAt || "1970-01-01T00:00:00.000Z";
 
@@ -135,8 +143,12 @@ export async function pullSync(): Promise<void> {
       credentials: "include",
     });
 
+    // جلسة منتهية أو غير مصرح — تجاهل بصمت
+    if (res.status === 401 || res.status === 403) return;
+
     if (!res.ok) {
-      throw new Error(`Pull sync failed with status: ${res.status}`);
+      console.warn(`[SyncEngine] Pull sync returned ${res.status}`);
+      return;
     }
 
     const data = await res.json();
@@ -161,8 +173,8 @@ export async function pullSync(): Promise<void> {
     }
 
     notify({ lastSyncAt: new Date().toISOString() });
-  } catch (err) {
-    console.error("Delta pull failed:", err);
+  } catch {
+    // فشل الشبكة — تجاهل بصمت (offline / cors)
   }
 }
 

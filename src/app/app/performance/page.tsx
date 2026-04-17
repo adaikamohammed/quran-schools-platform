@@ -1,33 +1,57 @@
 "use client";
 import SchoolGuard from "@/components/layout/SchoolGuard";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getDB } from "@/lib/storage/db";
 import type { Student, DailySession, AppUser } from "@/lib/types";
+import {
+  getCurrentSeason, getSeasonDateRange, formatSeasonLabel,
+  SEASONS, type SeasonNumber,
+} from "@/lib/seasons";
 import { motion } from "framer-motion";
 import {
   BarChart3, TrendingUp, TrendingDown, Users,
-  Calendar, CheckCircle, AlertCircle, Clock,
+  CheckCircle, AlertCircle, Clock,
   Star, BookOpen, Activity, Award, ChevronDown,
   Filter, RefreshCw, Trophy, Medal, BookCheck, Flame,
+  Minus, Printer, ArrowUpRight, ArrowDownRight,
+  Calendar, Layers,
 } from "lucide-react";
 
-// ─── مساعد ────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// مساعدات
+// ─────────────────────────────────────────────────────────────
 
 function getMonthLabel(monthIndex: number): string {
-  const months = ["جانفي", "فيفري", "مارس", "أفريل", "ماي", "جوان",
-    "جويلية", "أوت", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+  const months = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+    "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
   return months[monthIndex] ?? String(monthIndex + 1);
 }
 
 function getWeekLabel(dateStr: string): string {
   const d = new Date(dateStr);
   const week = Math.ceil(d.getDate() / 7);
-  return `أ${week} ${getMonthLabel(d.getMonth())}`;
+  return `أ${week} ${getMonthLabel(d.getMonth()).slice(0, 3)}`;
 }
 
-// ─── شريط التقدم ──────────────────────────────────────────
+/** حساب ميل الانحدار الخطي البسيط — يُعيد قيمة موجبة أو سالبة */
+function calcLinearTrendSlope(values: number[]): number {
+  const n = values.length;
+  if (n < 2) return 0;
+  const xMean = (n - 1) / 2;
+  const yMean = values.reduce((a, b) => a + b, 0) / n;
+  let num = 0, den = 0;
+  values.forEach((y, x) => {
+    num += (x - xMean) * (y - yMean);
+    den += (x - xMean) ** 2;
+  });
+  return den === 0 ? 0 : num / den;
+}
+
+// ─────────────────────────────────────────────────────────────
+// مكوّن شريط التقدم
+// ─────────────────────────────────────────────────────────────
 
 function ProgressBar({ value, max, color = "bg-emerald-400" }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
@@ -46,11 +70,154 @@ function ProgressBar({ value, max, color = "bg-emerald-400" }: { value: number; 
   );
 }
 
-// ─── بطاقة KPI ────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// مكوّن مؤشر الاتجاه
+// ─────────────────────────────────────────────────────────────
+
+function TrendIndicator({ slope, className = "" }: { slope: number; className?: string }) {
+  if (Math.abs(slope) < 0.5) {
+    return (
+      <span className={`flex items-center gap-1 text-[11px] font-bold text-gray-400 ${className}`}>
+        <Minus className="w-3 h-3" /> مستقر
+      </span>
+    );
+  }
+  const isUp = slope > 0;
+  return (
+    <span className={`flex items-center gap-1 text-[11px] font-bold ${isUp ? "text-emerald-600" : "text-red-500"} ${className}`}>
+      {isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+      {isUp ? "اتجاه نمو" : "اتجاه تراجع"}
+    </span>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// رسم بياني مع خط الاتجاه (CSS + SVG)
+// ─────────────────────────────────────────────────────────────
+
+function BarChartWithTrend({
+  data,
+  color = "bg-[var(--color-primary)]",
+  label,
+  showTrend = true,
+}: {
+  data: { label: string; value: number; max: number }[];
+  color?: string;
+  label: string;
+  showTrend?: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      setContainerWidth(entries[0].contentRect.width);
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const globalMax = Math.max(...data.map(d => d.max || 1), 1);
+  const values = data.map(d => d.value);
+  const slope = calcLinearTrendSlope(values);
+
+  // نقاط خط الاتجاه (أعلى كل عضادة + خط الانحدار)
+  const BAR_HEIGHT = 20; // px — ارتفاع كل عضادة
+  const BAR_GAP = 8;     // px — مسافة بين العضادات
+  const LABEL_W = 52;    // px — عرض اللصيقة الجانبية
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider">{label}</p>
+        {showTrend && values.filter(v => v > 0).length >= 3 && (
+          <TrendIndicator slope={slope} />
+        )}
+      </div>
+
+      {/* العضادات */}
+      <div ref={containerRef} className="space-y-2 relative">
+        {data.map((d, i) => (
+          <div key={i} className="flex items-center gap-3">
+            <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 w-13 shrink-0 text-left" style={{ width: LABEL_W }}>{d.label}</span>
+            <div className="flex-1 h-5 bg-gray-100 dark:bg-white/8 rounded-lg overflow-hidden relative">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.round((d.value / globalMax) * 100)}%` }}
+                transition={{ delay: i * 0.05, duration: 0.5 }}
+                className={`h-full ${color} rounded-lg`}
+              />
+            </div>
+            <span className="text-[11px] font-black text-gray-600 dark:text-gray-300 w-8 shrink-0">{d.value}</span>
+          </div>
+        ))}
+
+        {/* خط الاتجاه SVG — يُرسم فوق العضادات */}
+        {showTrend && values.filter(v => v > 0).length >= 3 && containerWidth > 0 && (() => {
+          const n = data.length;
+          const totalH = n * (BAR_HEIGHT + BAR_GAP) - BAR_GAP;
+          const barAreaW = containerWidth - LABEL_W - 36; // 36 = gap + رقم
+          const xMean = (n - 1) / 2;
+          const yMean = values.reduce((a, b) => a + b, 0) / n;
+          let num = 0, den = 0;
+          values.forEach((y, x) => { num += (x - xMean) * (y - yMean); den += (x - xMean) ** 2; });
+          const slope2 = den === 0 ? 0 : num / den;
+          const intercept = yMean - slope2 * xMean;
+
+
+
+          // نقاط بسيطة: وسط كل عضادة أفقياً، وارتفاع الاتجاه المتوقع
+          const pts = data.map((d, i) => {
+            const predictedPct = Math.max(0, Math.min(100, ((slope2 * i + intercept) / globalMax) * 100));
+            const xPx = LABEL_W + 6 + (barAreaW * i / Math.max(n - 1, 1));
+            const yPx = (BAR_HEIGHT + BAR_GAP) * i + BAR_HEIGHT / 2;
+            return { x: xPx, y: yPx, pct: predictedPct };
+          });
+
+          const pathD = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+
+          return (
+            <svg
+              className="absolute inset-0 pointer-events-none"
+              width={containerWidth}
+              height={n * (BAR_HEIGHT + BAR_GAP)}
+              style={{ top: 0, left: 0 }}
+            >
+              <defs>
+                <linearGradient id="trendGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor={slope > 0 ? "#10b981" : "#ef4444"} stopOpacity="0.6" />
+                  <stop offset="100%" stopColor={slope > 0 ? "#10b981" : "#ef4444"} stopOpacity="1" />
+                </linearGradient>
+              </defs>
+              <path
+                d={pathD}
+                fill="none"
+                stroke="url(#trendGrad)"
+                strokeWidth="2"
+                strokeDasharray="5 3"
+                strokeLinecap="round"
+              />
+              {pts.map((p, i) => (
+                <circle key={i} cx={p.x} cy={p.y} r="3"
+                  fill={slope > 0 ? "#10b981" : "#ef4444"}
+                  opacity="0.8"
+                />
+              ))}
+            </svg>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// بطاقة KPI
+// ─────────────────────────────────────────────────────────────
 
 function KpiCard({
-  label, value, sub, icon: Icon, gradient, delay = 0,
-  trend,
+  label, value, sub, icon: Icon, gradient, delay = 0, trend,
 }: {
   label: string; value: string | number; sub?: string;
   icon: React.ElementType; gradient: string; delay?: number;
@@ -75,49 +242,356 @@ function KpiCard({
       {trend && (
         <div className={`flex items-center gap-1 mt-2 text-xs font-bold ${trend.up ? "text-emerald-600" : "text-red-500"}`}>
           {trend.up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-          {trend.value}%
+          {trend.value > 0 ? `+${trend.value}` : trend.value}%
         </div>
       )}
     </motion.div>
   );
 }
 
-// ─── رسم بياني بالعضادات (CSS-based) ─────────────────────
+// ─────────────────────────────────────────────────────────────
+// المقارنة الفصلية
+// ─────────────────────────────────────────────────────────────
 
-function BarChartSimple({
-  data,
-  color = "bg-[var(--color-primary)]",
-  label,
-}: {
-  data: { label: string; value: number; max: number }[];
-  color?: string;
+interface SeasonStats {
   label: string;
-}) {
-  const globalMax = Math.max(...data.map(d => d.max || 1), 1);
+  emoji: string;
+  color: string;
+  attendanceRate: number;
+  memExcellentRate: number;
+  sessionsCount: number;
+  studentsCount: number;
+  bestStudent: string | null;
+  totalPresent: number;
+  totalAbsent: number;
+}
+
+function computeSeasonStats(
+  seasonNum: SeasonNumber,
+  year: number,
+  sessions: DailySession[],
+  students: Student[]
+): SeasonStats {
+  const season = SEASONS[seasonNum];
+  const { from, to } = getSeasonDateRange(seasonNum, year);
+  const filtered = sessions.filter(s =>
+    s.date >= from && s.date <= to &&
+    s.sessionType !== "يوم عطلة" && s.sessionType !== "غياب المعلم"
+  );
+
+  const studentIds = new Set(students.map(s => s.id));
+  let totalPresent = 0, totalAbsent = 0, totalAttendance = 0;
+  let totalMemExcellent = 0, totalMem = 0;
+  const studentScores: Record<string, { name: string; present: number; total: number }> = {};
+
+  filtered.forEach(session => {
+    session.records.forEach(rec => {
+      if (!studentIds.has(rec.studentId)) return;
+      if (rec.attendance) {
+        totalAttendance++;
+        if (["حاضر", "تعويض", "متأخر"].includes(rec.attendance)) totalPresent++;
+        if (rec.attendance === "غائب") totalAbsent++;
+      }
+      if (rec.memorization === "ممتاز") totalMemExcellent++;
+      if (rec.memorization) totalMem++;
+
+      if (!studentScores[rec.studentId]) {
+        const st = students.find(s => s.id === rec.studentId);
+        studentScores[rec.studentId] = { name: st?.fullName ?? "مجهول", present: 0, total: 0 };
+      }
+      studentScores[rec.studentId].total++;
+      if (["حاضر", "تعويض"].includes(rec.attendance ?? "")) {
+        studentScores[rec.studentId].present++;
+      }
+    });
+  });
+
+  const bestStudent = Object.values(studentScores)
+    .filter(s => s.total >= 3)
+    .sort((a, b) => (b.present / b.total) - (a.present / a.total))[0]?.name ?? null;
+
+  return {
+    label: season.name,
+    emoji: season.emoji,
+    color: season.color,
+    attendanceRate: totalAttendance > 0 ? Math.round((totalPresent / totalAttendance) * 100) : 0,
+    memExcellentRate: totalMem > 0 ? Math.round((totalMemExcellent / totalMem) * 100) : 0,
+    sessionsCount: filtered.length,
+    studentsCount: students.length,
+    totalPresent,
+    totalAbsent,
+    bestStudent,
+  };
+}
+
+function DeltaBadge({ current, prev, unit = "%" }: { current: number; prev: number; unit?: string }) {
+  const diff = current - prev;
+  if (prev === 0) return null;
+  const isUp = diff > 0;
+  const isZero = diff === 0;
   return (
-    <div>
-      <p className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">{label}</p>
-      <div className="space-y-2">
-        {data.map((d, i) => (
-          <div key={i} className="flex items-center gap-3">
-            <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 w-16 shrink-0 text-left">{d.label}</span>
-            <div className="flex-1 h-5 bg-gray-100 dark:bg-white/8 rounded-lg overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.round((d.value / globalMax) * 100)}%` }}
-                transition={{ delay: i * 0.05, duration: 0.5 }}
-                className={`h-full ${color} rounded-lg`}
-              />
+    <span className={`flex items-center gap-0.5 text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+      isZero ? "bg-gray-100 text-gray-500"
+      : isUp ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700"
+      : "bg-red-100 dark:bg-red-500/20 text-red-600"
+    }`}>
+      {isZero ? <Minus className="w-2.5 h-2.5" /> : isUp ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
+      {isZero ? "نفسه" : `${isUp ? "+" : ""}${diff}${unit}`}
+    </span>
+  );
+}
+
+function SeasonComparison({
+  sessions,
+  students,
+}: {
+  sessions: DailySession[];
+  students: Student[];
+}) {
+  const now = new Date();
+  const currentSeasonNum = getCurrentSeason().number;
+  const currentYear = now.getFullYear();
+
+  // الفصل السابق
+  const prevSeasonNum = currentSeasonNum === 1 ? 4 : (currentSeasonNum - 1) as SeasonNumber;
+  const prevYear = currentSeasonNum === 1 ? currentYear - 1 : currentYear;
+
+  const current = useMemo(() =>
+    computeSeasonStats(currentSeasonNum, currentYear, sessions, students),
+    [sessions, students, currentSeasonNum, currentYear]
+  );
+  const prev = useMemo(() =>
+    computeSeasonStats(prevSeasonNum, prevYear, sessions, students),
+    [sessions, students, prevSeasonNum, prevYear]
+  );
+
+  const metrics = [
+    {
+      label: "نسبة الحضور",
+      icon: CheckCircle,
+      currentVal: `${current.attendanceRate}%`,
+      prevVal: `${prev.attendanceRate}%`,
+      diff: current.attendanceRate - prev.attendanceRate,
+      unit: "%",
+      color: "text-emerald-600",
+    },
+    {
+      label: "الحفظ الممتاز",
+      icon: Star,
+      currentVal: `${current.memExcellentRate}%`,
+      prevVal: `${prev.memExcellentRate}%`,
+      diff: current.memExcellentRate - prev.memExcellentRate,
+      unit: "%",
+      color: "text-amber-600",
+    },
+    {
+      label: "الحصص المسجلة",
+      icon: Calendar,
+      currentVal: String(current.sessionsCount),
+      prevVal: String(prev.sessionsCount),
+      diff: current.sessionsCount - prev.sessionsCount,
+      unit: "",
+      color: "text-indigo-600",
+    },
+    {
+      label: "حضور إجمالي",
+      icon: Users,
+      currentVal: String(current.totalPresent),
+      prevVal: String(prev.totalPresent),
+      diff: current.totalPresent - prev.totalPresent,
+      unit: "",
+      color: "text-blue-600",
+    },
+  ];
+
+  return (
+    <div className="space-y-5">
+      {/* رأس المقارنة */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* الفصل الحالي */}
+        <motion.div
+          initial={{ opacity: 0, x: -12 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="bg-white dark:bg-[var(--color-card)] rounded-2xl border-2 p-5 relative overflow-hidden"
+          style={{ borderColor: current.color }}
+        >
+          <div className="absolute top-0 right-0 w-20 h-20 rounded-full opacity-10 -translate-y-4 translate-x-4"
+            style={{ background: current.color }} />
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-2xl">{current.emoji}</span>
+            <div>
+              <p className="font-black text-gray-800 dark:text-white text-sm">{current.label}</p>
+              <p className="text-[10px] text-gray-400">الفصل الحالي — {currentYear}</p>
             </div>
-            <span className="text-[11px] font-black text-gray-600 dark:text-gray-300 w-8 shrink-0">{d.value}</span>
+            <span className="mr-auto text-xs font-black px-2 py-0.5 rounded-full text-white"
+              style={{ background: current.color }}>
+              الحالي
+            </span>
           </div>
-        ))}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-3">
+              <p className="text-xl font-black" style={{ color: current.color }}>{current.attendanceRate}%</p>
+              <p className="text-[10px] text-gray-400">نسبة الحضور</p>
+            </div>
+            <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-3">
+              <p className="text-xl font-black text-amber-600">{current.memExcellentRate}%</p>
+              <p className="text-[10px] text-gray-400">حفظ ممتاز</p>
+            </div>
+            <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-3">
+              <p className="text-xl font-black text-indigo-600">{current.sessionsCount}</p>
+              <p className="text-[10px] text-gray-400">حصة مسجلة</p>
+            </div>
+            <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-3">
+              <p className="text-xl font-black text-blue-600">{current.totalPresent}</p>
+              <p className="text-[10px] text-gray-400">حضور إجمالي</p>
+            </div>
+          </div>
+          {current.bestStudent && (
+            <div className="mt-3 flex items-center gap-2 p-2.5 bg-amber-50 dark:bg-amber-500/10 rounded-xl">
+              <Trophy className="w-4 h-4 text-amber-500 shrink-0" />
+              <p className="text-xs font-bold text-amber-700 dark:text-amber-300 truncate">
+                الأفضل: {current.bestStudent}
+              </p>
+            </div>
+          )}
+        </motion.div>
+
+        {/* الفصل الماضي */}
+        <motion.div
+          initial={{ opacity: 0, x: 12 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] p-5 relative overflow-hidden opacity-80"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-2xl">{prev.emoji}</span>
+            <div>
+              <p className="font-black text-gray-800 dark:text-white text-sm">{prev.label}</p>
+              <p className="text-[10px] text-gray-400">الفصل الماضي — {prevYear}</p>
+            </div>
+            <span className="mr-auto text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 dark:bg-white/10 text-gray-500">
+              السابق
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-3">
+              <p className="text-xl font-black text-gray-600">{prev.attendanceRate}%</p>
+              <p className="text-[10px] text-gray-400">نسبة الحضور</p>
+            </div>
+            <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-3">
+              <p className="text-xl font-black text-gray-500">{prev.memExcellentRate}%</p>
+              <p className="text-[10px] text-gray-400">حفظ ممتاز</p>
+            </div>
+            <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-3">
+              <p className="text-xl font-black text-gray-500">{prev.sessionsCount}</p>
+              <p className="text-[10px] text-gray-400">حصة مسجلة</p>
+            </div>
+            <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-3">
+              <p className="text-xl font-black text-gray-500">{prev.totalPresent}</p>
+              <p className="text-[10px] text-gray-400">حضور إجمالي</p>
+            </div>
+          </div>
+          {prev.bestStudent && (
+            <div className="mt-3 flex items-center gap-2 p-2.5 bg-gray-50 dark:bg-white/5 rounded-xl">
+              <Trophy className="w-4 h-4 text-gray-400 shrink-0" />
+              <p className="text-xs font-bold text-gray-500 truncate">
+                الأفضل: {prev.bestStudent}
+              </p>
+            </div>
+          )}
+        </motion.div>
       </div>
+
+      {/* جدول الفروقات */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] overflow-hidden"
+      >
+        <div className="flex items-center gap-2 p-4 border-b border-[var(--color-border)]">
+          <Layers className="w-4 h-4 text-indigo-500" />
+          <h3 className="text-sm font-black text-gray-800 dark:text-white">مقارنة تفصيلية بين الفصلين</h3>
+        </div>
+        <div className="divide-y divide-gray-100 dark:divide-white/5">
+          {metrics.map(m => {
+            const Icon = m.icon;
+            const isUp = m.diff > 0;
+            const isZero = m.diff === 0;
+            return (
+              <div key={m.label} className="flex items-center gap-4 p-4">
+                <div className="w-8 h-8 rounded-xl bg-gray-100 dark:bg-white/10 flex items-center justify-center shrink-0">
+                  <Icon className={`w-4 h-4 ${m.color}`} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-gray-700 dark:text-gray-200">{m.label}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-center">
+                    <p className="text-xs text-gray-400">السابق</p>
+                    <p className="text-sm font-black text-gray-500">{m.prevVal}</p>
+                  </div>
+                  <div className="w-8 flex items-center justify-center">
+                    {isZero ? (
+                      <Minus className="w-4 h-4 text-gray-300" />
+                    ) : isUp ? (
+                      <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+                    ) : (
+                      <ArrowDownRight className="w-4 h-4 text-red-500" />
+                    )}
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-gray-400">الحالي</p>
+                    <p className={`text-sm font-black ${isZero ? "text-gray-600" : isUp ? "text-emerald-600" : "text-red-500"}`}>
+                      {m.currentVal}
+                    </p>
+                  </div>
+                  <DeltaBadge current={Number(m.currentVal.replace("%",""))} prev={Number(m.prevVal.replace("%",""))} unit={m.unit} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </motion.div>
+
+      {/* جميع فصول السنة */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] p-5"
+      >
+        <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-4">نسبة الحضور — جميع فصول {currentYear}</p>
+        <div className="grid grid-cols-4 gap-3">
+          {([1, 2, 3, 4] as SeasonNumber[]).map(sn => {
+            const s = computeSeasonStats(sn, currentYear, sessions, students);
+            const isActive = sn === currentSeasonNum;
+            return (
+              <div key={sn}
+                className={`rounded-xl p-3 text-center border transition-all ${isActive
+                  ? "border-2 shadow-sm"
+                  : "border-[var(--color-border)] opacity-70"
+                }`}
+                style={{ borderColor: isActive ? SEASONS[sn].color : undefined }}
+              >
+                <p className="text-xl mb-1">{SEASONS[sn].emoji}</p>
+                <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">{SEASONS[sn].name}</p>
+                <p className="text-lg font-black" style={{ color: SEASONS[sn].color }}>
+                  {s.attendanceRate > 0 ? `${s.attendanceRate}%` : "—"}
+                </p>
+                <p className="text-[10px] text-gray-400">{s.sessionsCount} حصة</p>
+                {isActive && <span className="inline-block mt-1 text-[9px] font-black text-white px-1.5 py-0.5 rounded-full" style={{ background: SEASONS[sn].color }}>الحالي</span>}
+              </div>
+            );
+          })}
+        </div>
+      </motion.div>
     </div>
   );
 }
 
-// ─── مقارنة الأفواج ──────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// مقارنة الأفواج
+// ─────────────────────────────────────────────────────────────
 
 interface GroupStat {
   groupName: string;
@@ -276,7 +750,7 @@ function GroupsComparison({ teachers, allStudents, allSessions }: {
           className="bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] p-5">
           <div className="flex items-center gap-2 mb-4">
             <BookCheck className="w-4 h-4 text-blue-500" />
-            <h3 className="text-sm font-black text-gray-800 dark:text-white">مقارنة معدل الحفظ الأسبوعي</h3>
+            <h3 className="text-sm font-black text-gray-800 dark:text-white">مقارنة معدل الحفظ</h3>
           </div>
           <div className="space-y-3">
             {groups.map((g, i) => {
@@ -303,7 +777,7 @@ function GroupsComparison({ teachers, allStudents, allSessions }: {
         </motion.div>
       </div>
 
-      {/* جدول ترتيب كامل */}
+      {/* جدول كامل */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
         className="bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] overflow-hidden">
         <div className="flex items-center gap-2 p-5 border-b border-[var(--color-border)]">
@@ -349,7 +823,29 @@ function GroupsComparison({ teachers, allStudents, allSessions }: {
   );
 }
 
-// ─── الصفحة الرئيسية ──────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// CSS الطباعة (مُدرج في الصفحة)
+// ─────────────────────────────────────────────────────────────
+
+function PrintStyles() {
+  return (
+    <style dangerouslySetInnerHTML={{ __html: `
+      @media print {
+        body { direction: rtl; font-family: serif; }
+        .no-print { display: none !important; }
+        .print-break { page-break-before: always; }
+        nav, header, aside, .sidebar, [data-sidebar] { display: none !important; }
+        .max-w-5xl { max-width: 100% !important; }
+        .dark\\:bg-\\[var\\(--color-card\\)\\] { background: white !important; }
+        * { color: black !important; border-color: #ddd !important; }
+      }
+    `}} />
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// الصفحة الرئيسية
+// ─────────────────────────────────────────────────────────────
 
 function PerformancePage() {
   const { user, school, isPrincipal } = useAuth();
@@ -358,8 +854,13 @@ function PerformancePage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [sessions, setSessions] = useState<DailySession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<"annual" | "weekly" | "groups">("annual");
+  const [viewMode, setViewMode] = useState<"annual" | "weekly" | "seasonal" | "groups">("annual");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [printing, setPrinting] = useState(false);
+
+  // بيانات المقارنة غير المُصفاة
+  const [compStudents, setCompStudents] = useState<Student[]>([]);
+  const [compSessions, setCompSessions] = useState<DailySession[]>([]);
 
   const load = useCallback(async () => {
     if (!school?.id) return;
@@ -382,13 +883,9 @@ function PerformancePage() {
       allSessions = await db.sessions.where("teacherId").equals(user!.id).toArray();
     }
 
-    // For groups comparison, we always load all data regardless of teacher filter
-    const allStudentsForComparison = (isPrincipal || user?.role === "super_admin")
-      ? await db.students.where("schoolId").equals(school.id).filter(s => s.status === "نشط").toArray()
-      : studs;
-    const allSessionsForComparison = (isPrincipal || user?.role === "super_admin")
-      ? await db.sessions.where("schoolId").equals(school.id).toArray()
-      : allSessions;
+    // نحتفظ بنسخة غير مُصفاة للمقارنة
+    setCompStudents([...studs]);
+    setCompSessions([...allSessions]);
 
     if (selectedTeacherId !== "all") {
       studs = studs.filter(s => s.teacherId === selectedTeacherId);
@@ -397,84 +894,48 @@ function PerformancePage() {
 
     setStudents(studs);
     setSessions(allSessions.filter(s => new Date(s.date).getFullYear() === selectedYear));
-
-    // Store unfiltered data for comparison tab
-    (loadRef as any)._allStudents = allStudentsForComparison;
-    (loadRef as any)._allSessions = allSessionsForComparison;
-
     setLoading(false);
   }, [school?.id, isPrincipal, user?.id, selectedTeacherId, selectedYear]);
 
-  // Cache ref for unfiltered comparison data
-  const loadRef = load as any;
-  const [compStudents, setCompStudents] = useState<Student[]>([]);
-  const [compSessions, setCompSessions] = useState<DailySession[]>([]);
+  useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    load().then(() => {
-      setCompStudents(loadRef._allStudents || []);
-      setCompSessions(loadRef._allSessions || []);
-    });
-  }, [load]);
-
-  // ─── تحليل البيانات ───────────────────────────────────
+  // ─── تحليل البيانات ─────────────────────────────────────
 
   const analytics = useMemo(() => {
     const studentIds = new Set(students.map(s => s.id));
-
-    // إحصائيات الحضور الإجمالية
     let totalPresent = 0, totalAbsent = 0, totalLate = 0;
     let totalMemExcellent = 0, totalMemGood = 0, totalMemPoor = 0;
     let totalReviewDone = 0, totalReviewTotal = 0;
 
     const monthlyData: Record<number, { sessions: number; present: number; absent: number; memo: number; memoCount: number }> = {};
-    for (let m = 0; m < 12; m++) {
-      monthlyData[m] = { sessions: 0, present: 0, absent: 0, memo: 0, memoCount: 0 };
-    }
+    for (let m = 0; m < 12; m++) monthlyData[m] = { sessions: 0, present: 0, absent: 0, memo: 0, memoCount: 0 };
 
-    const weeklyData: { week: string; present: number; absent: number; total: number }[] = [];
     const weekMap: Record<string, { present: number; absent: number; total: number }> = {};
 
     sessions.forEach(session => {
       if (session.sessionType === "يوم عطلة" || session.sessionType === "غياب المعلم") return;
-
       const month = new Date(session.date).getMonth();
       monthlyData[month].sessions++;
-
       const weekLabel = getWeekLabel(session.date);
+      weekMap[weekLabel] = weekMap[weekLabel] ?? { present: 0, absent: 0, total: 0 };
 
       session.records.forEach(rec => {
         if (!studentIds.has(rec.studentId)) return;
-
         if (rec.attendance === "حاضر" || rec.attendance === "تعويض") {
-          totalPresent++;
-          monthlyData[month].present++;
-          weekMap[weekLabel] = weekMap[weekLabel] ?? { present: 0, absent: 0, total: 0 };
-          weekMap[weekLabel].present++;
-          weekMap[weekLabel].total++;
+          totalPresent++; monthlyData[month].present++;
+          weekMap[weekLabel].present++; weekMap[weekLabel].total++;
         } else if (rec.attendance === "غائب") {
-          totalAbsent++;
-          monthlyData[month].absent++;
-          weekMap[weekLabel] = weekMap[weekLabel] ?? { present: 0, absent: 0, total: 0 };
-          weekMap[weekLabel].absent++;
-          weekMap[weekLabel].total++;
+          totalAbsent++; monthlyData[month].absent++;
+          weekMap[weekLabel].absent++; weekMap[weekLabel].total++;
         } else if (rec.attendance === "متأخر") {
-          totalLate++;
-          weekMap[weekLabel] = weekMap[weekLabel] ?? { present: 0, absent: 0, total: 0 };
-          weekMap[weekLabel].total++;
+          totalLate++; weekMap[weekLabel].total++;
         }
-
         const MEM_SCORES: Record<string, number> = { "ممتاز": 5, "جيد جداً": 4, "جيد": 3, "حسن": 3, "متوسط": 2, "لم يحفظ": 1 };
         const memoScore = rec.memorization ? (MEM_SCORES[rec.memorization] ?? 0) : 0;
-        if (memoScore > 0) {
-          monthlyData[month].memo += memoScore;
-          monthlyData[month].memoCount++;
-        }
-
+        if (memoScore > 0) { monthlyData[month].memo += memoScore; monthlyData[month].memoCount++; }
         if (rec.memorization === "ممتاز") totalMemExcellent++;
         else if (rec.memorization === "جيد جداً" || rec.memorization === "جيد") totalMemGood++;
         else if (rec.memorization === "لم يحفظ") totalMemPoor++;
-
         if (rec.review === true) totalReviewDone++;
         if (rec.review !== null) totalReviewTotal++;
       });
@@ -484,11 +945,9 @@ function PerformancePage() {
     const attendanceRate = totalAttendance > 0 ? Math.round((totalPresent / totalAttendance) * 100) : 0;
     const reviewRate = totalReviewTotal > 0 ? Math.round((totalReviewDone / totalReviewTotal) * 100) : 0;
 
-    // أفضل الطلاب (من الحصص)
+    // أفضل الطلاب
     const studentScores: Record<string, { name: string; present: number; total: number; memo: number; memoCount: number }> = {};
-    students.forEach(s => {
-      studentScores[s.id] = { name: s.fullName, present: 0, total: 0, memo: 0, memoCount: 0 };
-    });
+    students.forEach(s => { studentScores[s.id] = { name: s.fullName, present: 0, total: 0, memo: 0, memoCount: 0 }; });
     sessions.forEach(session => {
       if (session.sessionType === "يوم عطلة" || session.sessionType === "غياب المعلم") return;
       session.records.forEach(rec => {
@@ -496,9 +955,8 @@ function PerformancePage() {
         studentScores[rec.studentId].total++;
         if (rec.attendance === "حاضر" || rec.attendance === "تعويض") studentScores[rec.studentId].present++;
         const MEM_SCORES2: Record<string, number> = { "ممتاز": 5, "جيد جداً": 4, "جيد": 3, "حسن": 3, "متوسط": 2, "لم يحفظ": 1 };
-        const memoScore2 = rec.memorization ? (MEM_SCORES2[rec.memorization] ?? 0) : 0;
-        if (memoScore2 > 0) { studentScores[rec.studentId].memo += memoScore2; studentScores[rec.studentId].memoCount++; }
-
+        const ms = rec.memorization ? (MEM_SCORES2[rec.memorization] ?? 0) : 0;
+        if (ms > 0) { studentScores[rec.studentId].memo += ms; studentScores[rec.studentId].memoCount++; }
       });
     });
 
@@ -520,63 +978,75 @@ function PerformancePage() {
     };
   }, [sessions, students]);
 
+  // بيانات الرسوم
+  const hasData = (m: typeof analytics.monthlyData[0]) => m.present + m.absent > 0;
   const monthlyChartData = Array.from({ length: 12 }, (_, m) => {
     const d = analytics.monthlyData[m];
     const total = d.present + d.absent;
-    return {
-      label: getMonthLabel(m).slice(0, 3),
-      value: total > 0 ? Math.round((d.present / total) * 100) : 0,
-      max: 100,
-    };
-  }).filter(d => d.value > 0 || Object.values(analytics.monthlyData)[Object.keys(analytics.monthlyData).indexOf(String(
-    Array.from({ length: 12 }, (_, i) => i).find(m => analytics.monthlyData[m].sessions > 0) ?? 0
-  ))].sessions > 0);
+    return { label: getMonthLabel(m).slice(0, 3), value: total > 0 ? Math.round((d.present / total) * 100) : 0, max: 100 };
+  }).filter((_, m) => hasData(analytics.monthlyData[m]));
 
-  // آخر 8 أسابيع
   const weeklyKeys = Object.keys(analytics.weekMap).slice(-8);
   const weeklyChartData = weeklyKeys.map(week => {
     const d = analytics.weekMap[week];
-    return {
-      label: week,
-      value: d.total > 0 ? Math.round((d.present / d.total) * 100) : 0,
-      max: 100,
-    };
+    return { label: week, value: d.total > 0 ? Math.round((d.present / d.total) * 100) : 0, max: 100 };
   });
 
+  // خط الاتجاه للـ KPI
+  const attendanceTrend = useMemo(() => {
+    const vals = monthlyChartData.map(d => d.value).filter(v => v > 0);
+    if (vals.length < 3) return null;
+    const slope = calcLinearTrendSlope(vals);
+    const diff = Math.abs(Math.round(slope));
+    return { up: slope > 0.5, value: diff };
+  }, [monthlyChartData]);
+
+  // ─── تصدير PDF ──────────────────────────────────────────
+
+  const handlePrint = () => {
+    setPrinting(true);
+    setTimeout(() => {
+      window.print();
+      setPrinting(false);
+    }, 300);
+  };
+
   const years = [new Date().getFullYear(), new Date().getFullYear() - 1];
+  const isManager = isPrincipal || user?.role === "super_admin";
+  const chartData = viewMode === "annual" ? monthlyChartData : weeklyChartData;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6" dir="rtl">
+      <PrintStyles />
+
       {/* رأس */}
-      <div className="flex items-start justify-between gap-3 flex-wrap">
+      <div className="flex items-start justify-between gap-3 flex-wrap no-print">
         <div>
-          <h1
-            className="text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2"
-            style={{ fontFamily: "var(--font-headline)" }}
-          >
+          <h1 className="text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2"
+            style={{ fontFamily: "var(--font-headline)" }}>
             <BarChart3 className="w-6 h-6 text-[var(--color-primary)]" />
             لوحة الأداء
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            تحليل شامل للحضور والحفظ والأداء السنوي والأسبوعي
+            تحليل شامل للحضور والحفظ والأداء — مع خط الاتجاه والمقارنة الفصلية
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* السنة */}
-          {viewMode !== "groups" && (
-          <select
-            value={selectedYear}
-            onChange={e => setSelectedYear(+e.target.value)}
-            className="px-3 py-2 rounded-xl text-sm font-bold bg-white dark:bg-white/5 border border-[var(--color-border)] text-gray-700 dark:text-gray-300 focus:outline-none"
-          >
-            {years.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+          {viewMode !== "groups" && viewMode !== "seasonal" && (
+            <select
+              value={selectedYear}
+              onChange={e => setSelectedYear(+e.target.value)}
+              className="px-3 py-2 rounded-xl text-sm font-bold bg-white dark:bg-white/5 border border-[var(--color-border)] text-gray-700 dark:text-gray-300 focus:outline-none"
+            >
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
           )}
 
-          {/* النمط */}
+          {/* التبويبات */}
           <div className="flex rounded-xl overflow-hidden border border-[var(--color-border)]">
-            {(["annual", "weekly", "groups"] as const).map(mode => (
+            {(["annual", "weekly", "seasonal", "groups"] as const).map(mode => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
@@ -586,20 +1056,33 @@ function PerformancePage() {
                     : "bg-white dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:bg-gray-50"
                 }`}
               >
-                {mode === "annual" ? "سنوي" : mode === "weekly" ? "أسبوعي" : "🏆 مقارنة الأفواج"}
+                {mode === "annual" ? "📅 سنوي"
+                  : mode === "weekly" ? "📆 أسبوعي"
+                  : mode === "seasonal" ? "🌸 فصلي"
+                  : "🏆 الأفواج"}
               </button>
             ))}
           </div>
 
-          <button onClick={load} className="w-9 h-9 rounded-xl border border-[var(--color-border)] bg-white dark:bg-white/5 flex items-center justify-center text-gray-500 hover:text-[var(--color-primary)] transition-colors">
+          {/* تصدير PDF */}
+          <button
+            onClick={handlePrint}
+            disabled={printing}
+            title="تصدير PDF"
+            className="no-print w-9 h-9 rounded-xl border border-[var(--color-border)] bg-white dark:bg-white/5 flex items-center justify-center text-gray-500 hover:text-[var(--color-primary)] transition-colors disabled:opacity-50"
+          >
+            <Printer className="w-4 h-4" />
+          </button>
+
+          <button onClick={load} className="no-print w-9 h-9 rounded-xl border border-[var(--color-border)] bg-white dark:bg-white/5 flex items-center justify-center text-gray-500 hover:text-[var(--color-primary)] transition-colors">
             <RefreshCw className="w-4 h-4" />
           </button>
         </div>
       </div>
 
       {/* فلتر المعلم */}
-      {(isPrincipal || user?.role === "super_admin") && teachers.length > 0 && (
-        <div className="bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] p-4 flex items-center gap-3">
+      {isManager && teachers.length > 0 && viewMode !== "groups" && (
+        <div className="no-print bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] p-4 flex items-center gap-3">
           <Filter className="w-4 h-4 text-indigo-500 shrink-0" />
           <p className="text-sm font-bold text-gray-700 dark:text-gray-300 shrink-0">الفوج:</p>
           <select
@@ -615,6 +1098,7 @@ function PerformancePage() {
         </div>
       )}
 
+      {/* المحتوى */}
       {loading ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[...Array(8)].map((_, i) => (
@@ -622,7 +1106,7 @@ function PerformancePage() {
           ))}
         </div>
       ) : viewMode === "groups" ? (
-        (isPrincipal || user?.role === "super_admin") ? (
+        isManager ? (
           <GroupsComparison
             teachers={teachers}
             allStudents={compStudents.length > 0 ? compStudents : students}
@@ -632,16 +1116,26 @@ function PerformancePage() {
           <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-2xl p-8 text-center">
             <Trophy className="w-10 h-10 text-amber-400 mx-auto mb-3" />
             <p className="font-black text-amber-800 dark:text-amber-200">متاح للمدير فقط</p>
-            <p className="text-amber-600 dark:text-amber-400 text-sm mt-1">مقارنة الأفواج تتطلب صلاحية المدير لرؤية جميع المعلمين</p>
           </div>
         )
+      ) : viewMode === "seasonal" ? (
+        <SeasonComparison
+          sessions={compSessions.length > 0 ? compSessions : sessions}
+          students={compStudents.length > 0 ? compStudents : students}
+        />
       ) : (
         <>
           {/* KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <KpiCard label="نسبة الحضور" value={`${analytics.attendanceRate}%`}
+            <KpiCard
+              label="نسبة الحضور"
+              value={`${analytics.attendanceRate}%`}
               sub={`${analytics.totalPresent} حاضر · ${analytics.totalAbsent} غائب`}
-              icon={CheckCircle} gradient="from-emerald-500 to-green-600" delay={0} />
+              icon={CheckCircle}
+              gradient="from-emerald-500 to-green-600"
+              delay={0}
+              trend={attendanceTrend ?? undefined}
+            />
             <KpiCard label="المراجعة المنجزة" value={`${analytics.reviewRate}%`}
               icon={BookOpen} gradient="from-blue-500 to-indigo-600" delay={0.06} />
             <KpiCard label="تقييم ممتاز" value={analytics.totalMemExcellent}
@@ -651,24 +1145,24 @@ function PerformancePage() {
               icon={Users} gradient="from-purple-500 to-violet-600" delay={0.18} />
           </div>
 
-          {/* رسوم بيانية */}
+          {/* الرسوم البيانية مع خط الاتجاه */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* الرسم الشهري / الأسبوعي */}
             <motion.div
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
               className="bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] p-5"
             >
-              <BarChartSimple
-                data={viewMode === "annual" ? monthlyChartData : weeklyChartData}
+              <BarChartWithTrend
+                data={chartData}
                 color="bg-gradient-to-l from-[var(--color-primary)] to-emerald-400"
                 label={viewMode === "annual" ? "نسبة الحضور الشهرية (%)" : "نسبة الحضور الأسبوعية (%)"}
+                showTrend={true}
               />
-              {(viewMode === "annual" ? monthlyChartData : weeklyChartData).length === 0 && (
+              {chartData.length === 0 && (
                 <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-8">لا توجد بيانات كافية</p>
               )}
             </motion.div>
 
-            {/* توزيع تقييم الحفظ */}
+            {/* توزيع الحفظ */}
             <motion.div
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
               className="bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] p-5"
@@ -695,8 +1189,6 @@ function PerformancePage() {
                   );
                 })}
               </div>
-
-              {/* إجمالي */}
               <div className="mt-5 pt-4 border-t border-gray-100 dark:border-white/5 grid grid-cols-3 gap-3">
                 {[
                   { label: "حاضر", value: analytics.totalPresent, color: "text-emerald-600" },
@@ -736,9 +1228,7 @@ function PerformancePage() {
                       <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{s.name}</p>
                       <p className="text-xs text-gray-400">حضور {s.attendanceRate}%</p>
                     </div>
-                    <div className="text-left shrink-0">
-                      <p className="text-sm font-black text-[var(--color-primary)]">{s.score} نقطة</p>
-                    </div>
+                    <p className="text-sm font-black text-[var(--color-primary)] shrink-0">{s.score} نقطة</p>
                   </div>
                 ))}
               </div>

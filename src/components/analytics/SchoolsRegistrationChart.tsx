@@ -7,6 +7,7 @@ type ViewType = 'day' | 'week' | 'month';
 
 interface SchoolData {
   createdAt: string;
+  country?: string;
 }
 
 interface Props {
@@ -18,8 +19,9 @@ export default function SchoolsRegistrationChart({ data }: Props) {
   
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [selectedCountry, setSelectedCountry] = useState<string>('all');
 
-  // Generate years for dropdown
+  // Generate years and countries for dropdown
   const years = useMemo(() => {
     const minYear = data.reduce((min, s) => {
       const y = new Date(s.createdAt).getFullYear();
@@ -33,9 +35,19 @@ export default function SchoolsRegistrationChart({ data }: Props) {
     return res.sort((a,b) => b - a);
   }, [data, currentYear]);
 
+  const countries = useMemo(() => {
+    const uniqueCountries = new Set<string>();
+    data.forEach(s => { if (s.country) uniqueCountries.add(s.country); });
+    return Array.from(uniqueCountries).sort();
+  }, [data]);
+
   const chartData = useMemo(() => {
-    // Filter data by selected year
-    const filteredData = data.filter(s => new Date(s.createdAt).getFullYear() === selectedYear);
+    // Filter data by selected year and country
+    const filteredData = data.filter(s => {
+      const matchYear = new Date(s.createdAt).getFullYear() === selectedYear;
+      const matchCountry = selectedCountry === 'all' || s.country === selectedCountry;
+      return matchYear && matchCountry;
+    });
 
     if (viewType === 'month') {
       const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -107,12 +119,23 @@ export default function SchoolsRegistrationChart({ data }: Props) {
           </div>
         </div>
         
-        {/* Year Selector */}
-        <div className="flex items-center self-start sm:self-auto">
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          {countries.length > 0 && (
+            <select 
+              value={selectedCountry} 
+              onChange={(e) => setSelectedCountry(e.target.value)}
+              className="border-gray-200 border rounded-lg px-4 py-2 text-sm font-bold text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#ff40b4]/50 flex-1 sm:flex-none"
+              dir="rtl"
+            >
+              <option value="all">كل البلدان</option>
+              {countries.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          )}
           <select 
             value={selectedYear} 
             onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="border-gray-200 border rounded-lg px-4 py-2 text-sm font-bold text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#ff40b4]/50"
+            className="border-gray-200 border rounded-lg px-4 py-2 text-sm font-bold text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#ff40b4]/50 flex-1 sm:flex-none"
             dir="ltr"
           >
             {years.map(y => (

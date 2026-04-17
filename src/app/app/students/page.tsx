@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { createStudent, updateStudent, softDeleteStudent } from "@/lib/storage/mutations";
 import { syncNow } from "@/lib/storage/syncEngine";
 import type { Student, SubscriptionTier, MemorizationAmount, AppUser } from "@/lib/types";
+import { surahs } from "@/lib/surahs";
 import { motion, AnimatePresence } from "framer-motion";
 import Modal, { ModalSection } from "@/components/ui/Modal";
 import {
@@ -16,7 +17,7 @@ import {
   MoreVertical, Edit, Trash2, Eye, Check,
   ArrowUpDown, Download, Share2, MessageCircle,
   ArrowLeftRight, Clock, History, Loader2,
-  LayoutGrid, LayoutList
+  LayoutGrid, LayoutList, AlertTriangle
 } from "lucide-react";
 import Link from "next/link";
 import { getDialCode } from "@/lib/countries";
@@ -615,12 +616,16 @@ function StudentCard({
   onDelete,
   onTransfer,
   onHistory,
+  absenceCount = 0,
+  lastAttendanceDate,
 }: {
   student: Student;
   onEdit: (s: Student) => void;
   onDelete: (s: Student) => void;
   onTransfer: (s: Student) => void;
   onHistory: (s: Student) => void;
+  absenceCount?: number;
+  lastAttendanceDate?: string;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -630,6 +635,7 @@ function StudentCard({
       : student.status === "موقوف"
       ? "bg-amber-50 text-amber-700"
       : "bg-red-50 text-red-700";
+  const isAtRisk = absenceCount >= 3;
 
   return (
     <motion.div
@@ -637,8 +643,19 @@ function StudentCard({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className="bg-white rounded-2xl border border-[var(--color-border)] p-5 hover:shadow-md hover:border-[var(--color-primary)]/20 transition-all duration-200 group"
+      className={`bg-white rounded-2xl border p-5 hover:shadow-md transition-all duration-200 group ${
+        isAtRisk
+          ? "border-red-200 hover:border-red-300 bg-red-50/10"
+          : "border-[var(--color-border)] hover:border-[var(--color-primary)]/20"
+      }`}
     >
+      {/* مؤشر الخطر */}
+      {isAtRisk && (
+        <div className="flex items-center gap-1.5 mb-3 px-2.5 py-1.5 bg-red-50 border border-red-200 rounded-xl">
+          <AlertTriangle className="w-3 h-3 text-red-500 shrink-0" />
+          <span className="text-[11px] font-black text-red-600">{absenceCount} غيابات — يحتاج متابعة</span>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -744,6 +761,14 @@ function StudentCard({
         </div>
       </div>
 
+      {/* آخر حضور */}
+      {lastAttendanceDate && (
+        <div className="flex items-center gap-1.5 mb-3 text-[10px] text-gray-400 font-bold">
+          <Clock className="w-3 h-3 shrink-0 text-gray-300" />
+          <span>آخر حضور: {new Date(lastAttendanceDate).toLocaleDateString("ar-DZ", { weekday: "short", day: "numeric", month: "short" })}</span>
+        </div>
+      )}
+
       {/* Contact + رابط الولي */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 text-gray-400 text-xs">
@@ -805,9 +830,13 @@ function StudentsPage() {
   const [filterStatus, setFilterStatus] = useState<"الكل" | "نشط" | "موقوف" | "مطرود">("الكل");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [filterGender, setFilterGender] = useState<"الكل" | "ذكر" | "أنثى">("الكل");
+  const [filterSurahId, setFilterSurahId] = useState<number | 0>(0);
   const [sortBy, setSortBy] = useState<"name" | "surahs" | "date">("name");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 24;
+
+  // بيانات الغيابات + آخر حضور
+  const [studentAttendance, setStudentAttendance] = useState<Map<string, { absences: number; lastAttendance: string }>>(new Map());
 
   const [teachers, setTeachers] = useState<AppUser[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>("all");
@@ -874,6 +903,30 @@ function StudentsPage() {
 
   useEffect(() => { loadStudents(); }, [loadStudents]);
 
+  // تحميل بيانات الغيابات وآخر حضور من الحصص المحلية
+  useEffect(() => {
+    if (students.length === 0) return;
+    const load = async () => {
+      const db = getDB();
+      const allSessions = await db.sessions.toArray();
+      const map = new Map<string, { absences: number; lastAttendance: string }>();
+      students.forEach(s => map.set(s.id, { absences: 0, lastAttendance: "" }));
+      allSessions.forEach(session => {
+        session.records?.forEach(rec => {
+          if (!map.has(rec.studentId)) return;
+          const cur = map.get(rec.studentId)!;
+          if (["حاضر", "متأخر", "تعويض"].includes(rec.attendance)) {
+            if (!cur.lastAttendance || session.date > cur.lastAttendance) cur.lastAttendance = session.date;
+          } else if (rec.attendance === "غائب") {
+            cur.absences++;
+          }
+        });
+      });
+      setStudentAttendance(new Map(map));
+    };
+    load();
+  }, [students]);
+
   // الأفواج الفريدة
   const groups = useMemo(() => {
     const all = [...new Set(students.map((s) => s.groupName))].filter(Boolean);
@@ -886,11 +939,12 @@ function StudentsPage() {
       const matchSearch =
         !search ||
         s.fullName.toLowerCase().includes(search.toLowerCase()) ||
-        s.guardianName.toLowerCase().includes(search.toLowerCase()) ||
-        s.phone1.includes(search);
+        s.guardianName?.toLowerCase().includes(search.toLowerCase()) ||
+        s.phone1?.includes(search);
       const matchStatus = filterStatus === "الكل" || s.status === filterStatus;
       const matchGender = filterGender === "الكل" || s.gender === filterGender;
-      return matchSearch && matchStatus && matchGender;
+      const matchSurah = !filterSurahId || s.currentSurahId === filterSurahId;
+      return matchSearch && matchStatus && matchGender && matchSurah;
     });
 
     result.sort((a, b) => {
@@ -901,7 +955,7 @@ function StudentsPage() {
     });
 
     return result;
-  }, [students, search, filterStatus, filterGender, sortBy]);
+  }, [students, search, filterStatus, filterGender, filterSurahId, sortBy]);
 
   // Reset to page 1 when filters change
   useEffect(() => { setCurrentPage(1); }, [search, filterStatus, filterGender, sortBy]);
@@ -989,7 +1043,10 @@ function StudentsPage() {
       }
     : undefined;
 
-  const activeCount = students.filter((s) => s.status === "نشط").length;
+  const activeCount   = students.filter(s => s.status === "نشط").length;
+  const suspendCount  = students.filter(s => s.status === "موقوف").length;
+  const expelledCount = students.filter(s => s.status === "مطرود").length;
+  const atRiskCount   = [...studentAttendance.values()].filter(v => v.absences >= 3).length;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -1013,22 +1070,52 @@ function StudentsPage() {
         </button>
       </div>
 
+      {/* شريط الإحصائيات السريعة */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "نشط",         count: activeCount,   color: "bg-emerald-50 border-emerald-200 text-emerald-700", icon: "✅" },
+          { label: "موقوف",       count: suspendCount,  color: "bg-amber-50 border-amber-200 text-amber-700",       icon: "⏸️" },
+          { label: "مطرود",       count: expelledCount, color: "bg-red-50 border-red-200 text-red-700",             icon: "❌" },
+          { label: "بحاجة متابعة", count: atRiskCount,   color: "bg-orange-50 border-orange-200 text-orange-700",   icon: "🔴" },
+        ].map(({ label, count, color, icon }) => (
+          <div key={label} className={`rounded-2xl border p-4 flex items-center gap-3 ${color}`}>
+            <span className="text-xl leading-none">{icon}</span>
+            <div>
+              <p className="text-2xl font-black leading-none" style={{ fontFamily: "var(--font-headline)" }}>{count}</p>
+              <p className="text-xs font-bold mt-0.5 opacity-70">{label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* شريط البحث والفلترة */}
       <div className="bg-white rounded-2xl border border-[var(--color-border)] p-4 space-y-4">
-        {/* بحث */}
-        <div className="relative">
-          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="ابحث بالاسم، اسم الولي، أو رقم الهاتف..."
-            className="w-full h-11 border-2 border-gray-100 rounded-xl pr-11 pl-4 text-sm focus:outline-none focus:border-[var(--color-primary)]/50 transition-all"
-          />
-          {search && (
-            <button onClick={() => setSearch("")} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
-              <X className="w-4 h-4" />
-            </button>
-          )}
+        {/* بحث + فلتر السورة */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ابحث بالاسم، اسم الولي، أو رقم الهاتف..."
+              className="w-full h-11 border-2 border-gray-100 rounded-xl pr-11 pl-4 text-sm focus:outline-none focus:border-[var(--color-primary)]/50 transition-all"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <select
+            value={filterSurahId}
+            onChange={e => setFilterSurahId(+e.target.value)}
+            className="h-11 border-2 border-gray-100 rounded-xl px-3 text-sm font-bold text-gray-600 focus:outline-none focus:border-[var(--color-primary)]/50 bg-white min-w-[140px]"
+          >
+            <option value={0}>📖 أي سورة</option>
+            {surahs.map(s => (
+              <option key={s.id} value={s.id}>سورة {s.name}</option>
+            ))}
+          </select>
         </div>
 
         {/* فلاتر */}
@@ -1163,16 +1250,21 @@ function StudentsPage() {
           {viewMode === "grid" ? (
             <motion.div layout className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <AnimatePresence mode="popLayout">
-                {paginatedStudents.map((student) => (
-                  <StudentCard
-                    key={student.id}
-                    student={student}
-                    onEdit={handleEdit}
-                    onDelete={setDeleteTarget}
-                    onTransfer={setTransferTarget}
-                    onHistory={setTimelineTarget}
-                  />
-                ))}
+                {paginatedStudents.map((student) => {
+                  const att = studentAttendance.get(student.id);
+                  return (
+                    <StudentCard
+                      key={student.id}
+                      student={student}
+                      onEdit={handleEdit}
+                      onDelete={setDeleteTarget}
+                      onTransfer={setTransferTarget}
+                      onHistory={setTimelineTarget}
+                      absenceCount={att?.absences ?? 0}
+                      lastAttendanceDate={att?.lastAttendance || undefined}
+                    />
+                  );
+                })}
               </AnimatePresence>
             </motion.div>
           ) : (

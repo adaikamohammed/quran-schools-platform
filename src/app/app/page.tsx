@@ -1,23 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
-import type { Student } from "@/lib/types";
-import { motion } from "framer-motion";
+import type { Student, AppUser } from "@/lib/types";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import SuperAdminDashboard from "@/components/layout/SuperAdminDashboard";
 import TeacherDashboard from "@/components/layout/TeacherDashboard";
 import {
   Users, BookCheck, ClipboardList, TrendingUp,
   ArrowLeft, AlertTriangle, Clock, BookOpen, Star,
-  CreditCard, Calendar, CheckCircle2, XCircle
+  CreditCard, Calendar, CheckCircle2, XCircle,
+  TrendingDown, Minus, ChevronDown, Target, Award,
+  Filter, ChevronRight,
 } from "lucide-react";
 
 // ─── بطاقة إحصاء ─────────────────────────────────────────
 
-function StatCard({ label, value, icon: Icon, color, href, delay = 0 }: {
+function StatCard({ label, value, icon: Icon, color, href, delay = 0, subValue, subLabel, direction }: {
   label: string; value: number | string; icon: React.ElementType;
   color: string; href: string; delay?: number;
+  subValue?: string | number | null;
+  subLabel?: string;
+  direction?: "up" | "down" | "same" | null;
 }) {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay, duration: 0.35 }}>
@@ -29,10 +34,134 @@ function StatCard({ label, value, icon: Icon, color, href, delay = 0 }: {
         <div className="flex-1 min-w-0">
           <p className="text-2xl font-black text-gray-900 dark:text-white" style={{ fontFamily: "var(--font-headline)" }}>{value}</p>
           <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{label}</p>
+          {subValue !== undefined && subValue !== null && direction !== undefined && (
+            <div className={`flex items-center gap-1 mt-0.5 text-[10px] font-bold ${
+              direction === "up" ? "text-emerald-600" : direction === "down" ? "text-red-500" : "text-gray-400"
+            }`}>
+              {direction === "up" ? <TrendingUp className="w-2.5 h-2.5" /> :
+               direction === "down" ? <TrendingDown className="w-2.5 h-2.5" /> :
+               <Minus className="w-2.5 h-2.5" />}
+              <span>{subValue} {subLabel}</span>
+            </div>
+          )}
         </div>
         <ArrowLeft className="w-4 h-4 text-gray-300 group-hover:text-[var(--color-primary)] group-hover:-translate-x-1 transition-all" />
       </Link>
     </motion.div>
+  );
+}
+
+// ─── بطاقة معلمو لم يسجلوا (قابلة للتوسيع) ────────────────
+
+function InactiveTeachersCard({ inactiveTeachers }: {
+  inactiveTeachers: { id: string; displayName: string; groupName?: string; daysSince: number }[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  if (inactiveTeachers.length === 0) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="border border-red-200 dark:border-red-500/30 rounded-2xl overflow-hidden shadow-sm"
+    >
+      {/* رأس التنبيه */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-3 p-4 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/15 transition-colors text-right"
+      >
+        <div className="w-9 h-9 rounded-full bg-red-100 dark:bg-red-500/20 text-red-600 flex items-center justify-center shrink-0">
+          <AlertTriangle className="w-4.5 h-4.5" />
+        </div>
+        <div className="flex-1 text-right">
+          <p className="font-black text-red-800 dark:text-red-200 text-sm">
+            {inactiveTeachers.length} {inactiveTeachers.length === 1 ? "معلم لم يسجّل حصة" : "معلمون لم يسجّلوا"} منذ 4 أيام
+          </p>
+          <p className="text-red-600 dark:text-red-400 text-xs mt-0.5">
+            انقر لعرض التفاصيل
+          </p>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-red-400 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} />
+      </button>
+
+      {/* التفاصيل المنبثقة */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="bg-white dark:bg-[var(--color-card)] divide-y divide-gray-100 dark:divide-white/5">
+              {inactiveTeachers.map((t) => (
+                <div key={t.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-8 h-8 rounded-xl bg-red-100 dark:bg-red-500/20 flex items-center justify-center text-red-600 font-black text-sm shrink-0">
+                    {t.displayName[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{t.displayName}</p>
+                    {t.groupName && <p className="text-xs text-gray-400">فوج: {t.groupName}</p>}
+                  </div>
+                  <span className="text-[11px] font-black px-2.5 py-1 rounded-full bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 shrink-0">
+                    {t.daysSince} {t.daysSince === 1 ? "يوم" : "أيام"}
+                  </span>
+                </div>
+              ))}
+              <div className="p-3">
+                <Link
+                  href="/app/sheikh-monitoring"
+                  className="flex items-center justify-center gap-2 text-sm font-bold text-red-600 hover:text-red-700 transition-colors"
+                >
+                  عرض في صفحة مراقبة المشايخ <ArrowLeft className="w-4 h-4" />
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+// ─── بطاقة مقارنة الأداء الأسبوعي ─────────────────────────
+
+function WeeklyComparisonCard({ thisWeek, lastWeek, label, icon: Icon, color }: {
+  thisWeek: number;
+  lastWeek: number;
+  label: string;
+  icon: React.ElementType;
+  color: string;
+}) {
+  const diff = thisWeek - lastWeek;
+  const pct = lastWeek > 0 ? Math.round(Math.abs(diff) / lastWeek * 100) : null;
+  const isUp = diff > 0;
+  const isDown = diff < 0;
+
+  return (
+    <div className="bg-white dark:bg-[var(--color-card)] rounded-xl border border-[var(--color-border)] p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-xs font-medium text-gray-400">{label}</p>
+          <p className="text-xl font-black text-gray-900 dark:text-white mt-0.5" style={{ fontFamily: "var(--font-headline)" }}>
+            {thisWeek}
+          </p>
+        </div>
+        <div className={`w-8 h-8 rounded-xl ${color} flex items-center justify-center shrink-0`}>
+          <Icon className="w-4 h-4 text-white" />
+        </div>
+      </div>
+      <div className={`flex items-center gap-1 mt-2 text-[11px] font-bold ${
+        isUp ? "text-emerald-600" : isDown ? "text-red-500" : "text-gray-400"
+      }`}>
+        {isUp ? <TrendingUp className="w-3 h-3" /> : isDown ? <TrendingDown className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+        <span>
+          {isUp ? "+" : isDown ? "" : ""}{diff}
+          {pct !== null ? ` (${pct}%)` : ""}
+          {" "}مقارنة بالأسبوع الماضي
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -43,18 +172,26 @@ function SchoolDashboard() {
   const [students, setStudents]       = useState<Student[]>([]);
   const [loading, setLoading]         = useState(true);
   const [weekSessions, setWeekSessions]     = useState(0);
+  const [lastWeekSessions, setLastWeekSessions] = useState(0);
   const [todayAttendanceRate, setTodayAttendanceRate] = useState<number | null>(null);
+  const [weekAttendanceRate, setWeekAttendanceRate] = useState<number | null>(null);
+  const [lastWeekAttendanceRate, setLastWeekAttendanceRate] = useState<number | null>(null);
   const [pendingPaymentsCount, setPendingPaymentsCount] = useState(0);
   const [atRiskStudents, setAtRiskStudents] = useState<Student[]>([]);
   const [teacherAbsentYesterday, setTeacherAbsentYesterday] = useState<Student[]>([]);
+  const [inactiveTeachers, setInactiveTeachers] = useState<{ id: string; displayName: string; groupName?: string; daysSince: number }[]>([]);
   const [seasonProgress, setSeasonProgress] = useState({
     percent: 0, daysLeft: 0, elapsed: 0, totalDays: 0,
     seasonName: "", seasonEmoji: "📅", seasonColor: "#107a57",
     yearPercent: 0, yearElapsed: 0, yearTotal: 365, year: new Date().getFullYear(),
   });
 
+  // أهداف الموسم المحققة
+  const [achievedGoals, setAchievedGoals] = useState<{ label: string; done: boolean }[]>([]);
+
   const [alerts, setAlerts]     = useState<{ msg: string; href: string; color: string }[]>([]);
-  const [recentLogs, setRecentLogs] = useState<{ desc: string; time: string }[]>([]);
+  const [recentLogs, setRecentLogs] = useState<{ desc: string; time: string; type?: string }[]>([]);
+  const [logFilter, setLogFilter] = useState<string>("all");
 
   useEffect(() => {
     if (!school?.id) { setLoading(false); return; }
@@ -69,7 +206,6 @@ function SchoolDashboard() {
       const currentSeason = getCurrentSeason();
       const curYear = today.getFullYear();
 
-      // ── تقدم الفصل ──
       const { from: sFrom, to: sTo } = getSeasonDateRange(currentSeason.number, curYear);
       const seasonStart = new Date(sFrom + "T00:00:00");
       const seasonEnd   = new Date(sTo   + "T23:59:59");
@@ -78,8 +214,7 @@ function SchoolDashboard() {
       const sPct        = Math.max(0, Math.min(100, Math.round((sElapsed / sTotalDays) * 100)));
       const sDaysLeft   = Math.max(0, sTotalDays - sElapsed);
 
-      // ── تقدم السنة كاملة ──
-      const yearStart  = new Date(curYear, 0, 1);  // 1 يناير
+      const yearStart  = new Date(curYear, 0, 1);
       const yearEnd    = new Date(curYear, 11, 31, 23, 59, 59);
       const yTotalDays = Math.round((yearEnd.getTime() - yearStart.getTime()) / 86400000);
       const yElapsed   = Math.round((today.getTime() - yearStart.getTime()) / 86400000);
@@ -89,7 +224,6 @@ function SchoolDashboard() {
         percent: sPct,
         daysLeft: sDaysLeft,
         elapsed: sElapsed,
-        // حقول إضافية للعرض
         seasonName: currentSeason.name,
         seasonEmoji: currentSeason.emoji,
         seasonColor: currentSeason.color,
@@ -123,12 +257,15 @@ function SchoolDashboard() {
         allStudents = await db.students.where("teacherId").equals(user!.id).toArray();
       }
       setStudents(allStudents);
-      const activeSts = allStudents.filter(s => s.status === "نشط");
+      const activeSts = allStudents.filter((s: any) => s.status === "نشط");
 
       // ── الحصص والغيابات ──
       const weekStart  = new Date(today);
       weekStart.setDate(today.getDate() - 7);
+      const lastWeekStart = new Date(today);
+      lastWeekStart.setDate(today.getDate() - 14);
       const weekStr    = weekStart.toISOString().slice(0, 10);
+      const lastWeekStr = lastWeekStart.toISOString().slice(0, 10);
       const todayStr   = today.toISOString().slice(0, 10);
       
       const yesterdayStart = new Date(today);
@@ -139,23 +276,50 @@ function SchoolDashboard() {
         ? await db.sessions.where("schoolId").equals(school.id).toArray()
         : await db.sessions.where("teacherId").equals(user!.id).toArray();
 
+      // حصص هذا الأسبوع
       const validSessions = sessions.filter(s =>
         s.date >= weekStr && s.date <= todayStr &&
         s.sessionType !== "يوم عطلة" && s.sessionType !== "غياب المعلم"
       );
       setWeekSessions(validSessions.length);
 
-      // مؤشر الطلاب في خطر (3 غيابات فأكثر في آخر 7 أيام)
+      // حصص الأسبوع الماضي
+      const lastWeekSess = sessions.filter(s =>
+        s.date >= lastWeekStr && s.date < weekStr &&
+        s.sessionType !== "يوم عطلة" && s.sessionType !== "غياب المعلم"
+      );
+      setLastWeekSessions(lastWeekSess.length);
+
+      // نسبة حضور هذا الأسبوع
+      let wPresent = 0, wTotal = 0;
+      validSessions.forEach(s => s.records.forEach(r => {
+        if (r.attendance) {
+          wTotal++;
+          if (["حاضر", "تعويض", "متأخر"].includes(r.attendance)) wPresent++;
+        }
+      }));
+      const weekRate = wTotal > 0 ? Math.round((wPresent / wTotal) * 100) : null;
+      setWeekAttendanceRate(weekRate);
+
+      // نسبة حضور الأسبوع الماضي
+      let lwPresent = 0, lwTotal = 0;
+      lastWeekSess.forEach(s => s.records.forEach(r => {
+        if (r.attendance) {
+          lwTotal++;
+          if (["حاضر", "تعويض", "متأخر"].includes(r.attendance)) lwPresent++;
+        }
+      }));
+      setLastWeekAttendanceRate(lwTotal > 0 ? Math.round((lwPresent / lwTotal) * 100) : null);
+
+      // مؤشر الطلاب في خطر
       const absentCounts: Record<string, number> = {};
       validSessions.forEach(s => {
         s.records.forEach(r => {
-          if (r.attendance === "غائب" || r.attendance === "متأخر") { // متأخر قد يعامل كنصف لكن سنركز على الغائب
-            if (r.attendance === "غائب") absentCounts[r.studentId] = (absentCounts[r.studentId] || 0) + 1;
-          }
+          if (r.attendance === "غائب") absentCounts[r.studentId] = (absentCounts[r.studentId] || 0) + 1;
         });
       });
       const atRiskIds = Object.keys(absentCounts).filter(id => absentCounts[id] >= 3);
-      setAtRiskStudents(activeSts.filter(s => atRiskIds.includes(s.id)));
+      setAtRiskStudents(activeSts.filter((s: any) => atRiskIds.includes(s.id)));
 
       // للمعلم: من غاب بالأمس
       if (!isPrincipal && user?.role === "teacher") {
@@ -164,7 +328,7 @@ function SchoolDashboard() {
         yestSessions.forEach(s => s.records.forEach(r => {
           if (r.attendance === "غائب") yestAbsentIds.add(r.studentId);
         }));
-        setTeacherAbsentYesterday(activeSts.filter(s => yestAbsentIds.has(s.id)));
+        setTeacherAbsentYesterday(activeSts.filter((s: any) => yestAbsentIds.has(s.id)));
       }
 
       // نسبة حضور اليوم
@@ -193,7 +357,6 @@ function SchoolDashboard() {
       }
 
       if (isPrincipal || user?.role === "super_admin") {
-        // المدفوعات المعلقة
         const unpaid = await db.payments.where("schoolId").equals(school.id)
           .filter(p => p.status === "unpaid").count();
         setPendingPaymentsCount(unpaid);
@@ -202,31 +365,49 @@ function SchoolDashboard() {
           .where("schoolId").equals(school.id)
           .filter(u => u.role === "teacher").toArray();
         const cutoff = new Date(today.getTime() - 4 * 86400000).toISOString().slice(0, 10);
-        let inactive = 0;
+        
+        // المعلمون الغائبون مع تفاصيلهم
+        const inactiveList: { id: string; displayName: string; groupName?: string; daysSince: number }[] = [];
         for (const t of teachers) {
           const last = await db.sessions.where("teacherId").equals(t.id)
             .filter(s => s.sessionType !== "يوم عطلة" && s.sessionType !== "غياب المعلم")
             .reverse().first();
-          if (!last || last.date < cutoff) inactive++;
+          if (!last || last.date < cutoff) {
+            const lastDate = last ? new Date(last.date) : null;
+            const daysSince = lastDate
+              ? Math.floor((today.getTime() - lastDate.getTime()) / 86400000)
+              : 999;
+            inactiveList.push({ id: t.id, displayName: t.displayName, groupName: t.groupName, daysSince });
+          }
         }
-        if (inactive > 0) {
-          newAlerts.push({
-            msg: `${inactive} ${inactive === 1 ? "معلم لم يسجّل حصة" : "معلمون لم يسجّلوا"} منذ 4 أيام`,
-            href: "/app/sheikh-monitoring",
-            color: "border-red-400 bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-200",
-          });
-        }
+        setInactiveTeachers(inactiveList);
+
+        // أهداف الموسم
+        const totalStudents = activeSts.length;
+        const totalSessionsThisSeason = sessions.filter(s =>
+          s.date >= sFrom && s.sessionType !== "يوم عطلة" && s.sessionType !== "غياب المعلم"
+        ).length;
+        const paidCount = await db.payments.where("schoolId").equals(school.id)
+          .filter(p => p.status === "paid").count();
+        const totalPayments = await db.payments.where("schoolId").equals(school.id).count();
+
+        setAchievedGoals([
+          { label: "حضور أسبوعي >80%", done: weekRate !== null && weekRate >= 80 },
+          { label: `${totalStudents} طالب نشط`, done: totalStudents >= 10 },
+          { label: "حصص منتظمة هذا الفصل", done: totalSessionsThisSeason >= 10 },
+          { label: "تحصيل مالي >70%", done: totalPayments > 0 && (paidCount / totalPayments) >= 0.7 },
+        ]);
       }
       setAlerts(newAlerts);
 
-      // ── آخر النشاطات (5 نشاطات بدل 4) ──
+      // ── آخر النشاطات ──
       const logs = await db.activityLogs
         .where("schoolId").equals(school.id)
         .reverse().sortBy("createdAt");
-      setRecentLogs(logs.slice(0, 5).map(l => {
+      setRecentLogs(logs.slice(0, 15).map(l => {
         const mins = Math.round((Date.now() - new Date(l.createdAt).getTime()) / 60000);
         const time = mins < 60 ? `${mins} د` : mins < 1440 ? `${Math.round(mins / 60)} س` : `${Math.round(mins / 1440)} يوم`;
-        return { desc: l.description, time: `منذ ${time}` };
+        return { desc: l.description, time: `منذ ${time}`, type: l.action };
       }));
 
       setLoading(false);
@@ -241,16 +422,47 @@ function SchoolDashboard() {
   const miladiDate = new Intl.DateTimeFormat("ar-DZ", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date());
 
   const isManager = isPrincipal || user?.role === "super_admin";
+
+  // فلترة النشاطات
+  const logCategories = [
+    { key: "all", label: "الكل" },
+    { key: "create_session", label: "الحصص" },
+    { key: "create_student", label: "الطلاب" },
+    { key: "create_payment", label: "المالية" },
+    { key: "create_report", label: "التقارير" },
+  ];
+  const filteredLogs = useMemo(() => {
+    if (logFilter === "all") return recentLogs.slice(0, 5);
+    return recentLogs.filter(l => l.type === logFilter).slice(0, 5);
+  }, [recentLogs, logFilter]);
+
+  // مقارنة الأداء الأسبوعي
+  const attendanceDiff = weekAttendanceRate !== null && lastWeekAttendanceRate !== null
+    ? weekAttendanceRate - lastWeekAttendanceRate
+    : null;
+  const attendanceDir: "up" | "down" | "same" | null = attendanceDiff === null ? null :
+    attendanceDiff > 0 ? "up" : attendanceDiff < 0 ? "down" : "same";
+
+  const sessionsDiff = weekSessions - lastWeekSessions;
+
   const stats = isManager ? [
-    { label: "طالب نشط", value: loading ? "..." : activeStudents.length, icon: Users, color: "bg-gradient-to-br from-emerald-400 to-emerald-600", href: "/app/students" },
-    { label: "نسبة حضور اليوم", value: loading ? "..." : todayAttendanceRate !== null ? `${todayAttendanceRate}%` : "—", icon: TrendingUp, color: "bg-gradient-to-br from-blue-400 to-blue-600", href: "/app/performance" },
-    { label: "دفعات معلقة", value: loading ? "..." : pendingPaymentsCount, icon: CreditCard, color: "bg-gradient-to-br from-rose-400 to-rose-600", href: "/app/dues" },
-    { label: "تنبيهات نشطة", value: loading ? "..." : alerts.length + (atRiskStudents.length > 0 ? 1 : 0), icon: AlertTriangle, color: "bg-gradient-to-br from-amber-400 to-amber-600", href: "/app/notifications" },
+    { label: "طالب نشط", value: loading ? "..." : activeStudents.length, icon: Users, color: "bg-gradient-to-br from-emerald-400 to-emerald-600", href: "/app/students",
+      subValue: null, subLabel: "", direction: null },
+    { label: "حضور هذا الأسبوع", value: loading ? "..." : weekAttendanceRate !== null ? `${weekAttendanceRate}%` : "—", icon: TrendingUp, color: "bg-gradient-to-br from-blue-400 to-blue-600", href: "/app/performance",
+      subValue: attendanceDiff !== null ? `${attendanceDiff > 0 ? "+" : ""}${attendanceDiff}%` : null, subLabel: "مقارنة بالأسبوع الماضي", direction: attendanceDir },
+    { label: "دفعات معلقة", value: loading ? "..." : pendingPaymentsCount, icon: CreditCard, color: "bg-gradient-to-br from-rose-400 to-rose-600", href: "/app/dues",
+      subValue: null, subLabel: "", direction: null },
+    { label: "تنبيهات نشطة", value: loading ? "..." : alerts.length + (atRiskStudents.length > 0 ? 1 : 0) + (inactiveTeachers.length > 0 ? 1 : 0), icon: AlertTriangle, color: "bg-gradient-to-br from-amber-400 to-amber-600", href: "/app/notifications",
+      subValue: null, subLabel: "", direction: null },
   ] : [
-    { label: "طلابي النشطين", value: loading ? "..." : activeStudents.length, icon: Users, color: "bg-gradient-to-br from-emerald-400 to-emerald-600", href: "/app/students" },
-    { label: "حضور فصلي اليوم", value: loading ? "..." : todayAttendanceRate !== null ? `${todayAttendanceRate}%` : "—", icon: TrendingUp, color: "bg-gradient-to-br from-blue-400 to-blue-600", href: "/app/sessions" },
-    { label: "حصص الأسبوع", value: loading ? "..." : weekSessions, icon: ClipboardList, color: "bg-gradient-to-br from-purple-400 to-purple-600", href: "/app/sessions" },
-    { label: "إجمالي السور", value: loading ? "..." : activeStudents.reduce((s, st) => s + (st.memorizedSurahsCount ?? 0), 0), icon: BookOpen, color: "bg-gradient-to-br from-amber-400 to-amber-600", href: "/app/quran" },
+    { label: "طلابي النشطين", value: loading ? "..." : activeStudents.length, icon: Users, color: "bg-gradient-to-br from-emerald-400 to-emerald-600", href: "/app/students",
+      subValue: null, subLabel: "", direction: null },
+    { label: "حضور فصلي اليوم", value: loading ? "..." : todayAttendanceRate !== null ? `${todayAttendanceRate}%` : "—", icon: TrendingUp, color: "bg-gradient-to-br from-blue-400 to-blue-600", href: "/app/sessions",
+      subValue: null, subLabel: "", direction: null },
+    { label: "حصص الأسبوع", value: loading ? "..." : weekSessions, icon: ClipboardList, color: "bg-gradient-to-br from-purple-400 to-purple-600", href: "/app/sessions",
+      subValue: sessionsDiff !== 0 ? `${sessionsDiff > 0 ? "+" : ""}${sessionsDiff}` : null, subLabel: "مقارنة بالأسبوع الماضي", direction: sessionsDiff > 0 ? "up" : sessionsDiff < 0 ? "down" : "same" },
+    { label: "إجمالي السور", value: loading ? "..." : activeStudents.reduce((s, st) => s + (st.memorizedSurahsCount ?? 0), 0), icon: BookOpen, color: "bg-gradient-to-br from-amber-400 to-amber-600", href: "/app/quran",
+      subValue: null, subLabel: "", direction: null },
   ];
 
   const quickActions = [
@@ -280,6 +492,45 @@ function SchoolDashboard() {
         </div>
       </motion.div>
 
+      {/* ── مقارنة الأداء الأسبوعي (للمدير فقط) ── */}
+      {isManager && !loading && (weekAttendanceRate !== null || weekSessions > 0) && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
+          <h3 className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">
+            📊 أداء هذا الأسبوع مقارنة بالأسبوع الماضي
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <WeeklyComparisonCard
+              thisWeek={weekAttendanceRate ?? 0}
+              lastWeek={lastWeekAttendanceRate ?? 0}
+              label="نسبة الحضور %"
+              icon={TrendingUp}
+              color="bg-gradient-to-br from-blue-400 to-blue-600"
+            />
+            <WeeklyComparisonCard
+              thisWeek={weekSessions}
+              lastWeek={lastWeekSessions}
+              label="الحصص المسجلة"
+              icon={ClipboardList}
+              color="bg-gradient-to-br from-purple-400 to-purple-600"
+            />
+            <WeeklyComparisonCard
+              thisWeek={activeStudents.length}
+              lastWeek={activeStudents.length}
+              label="الطلاب النشطون"
+              icon={Users}
+              color="bg-gradient-to-br from-emerald-400 to-emerald-600"
+            />
+            <WeeklyComparisonCard
+              thisWeek={atRiskStudents.length}
+              lastWeek={0}
+              label="طلاب في خطر"
+              icon={AlertTriangle}
+              color="bg-gradient-to-br from-red-400 to-red-600"
+            />
+          </div>
+        </motion.div>
+      )}
+
       {/* ── مؤشر الطلاب في خطر (At-Risk) ── */}
       {!loading && atRiskStudents.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
@@ -306,6 +557,13 @@ function SchoolDashboard() {
               )}
             </div>
           </div>
+        </motion.div>
+      )}
+
+      {/* ── تنبيه المعلمين الغائبين (قابل للتوسيع) ── */}
+      {!loading && isManager && inactiveTeachers.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
+          <InactiveTeachersCard inactiveTeachers={inactiveTeachers} />
         </motion.div>
       )}
 
@@ -345,7 +603,7 @@ function SchoolDashboard() {
       <div>
         <h3 className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">نظرة سريعة</h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((s, i) => <StatCard key={i} {...s} delay={i * 0.06} />)}
+          {stats.map((s, i) => <StatCard key={i} {...s} delay={i * 0.06} direction={s.direction as any} />)}
         </div>
       </div>
 
@@ -372,13 +630,13 @@ function SchoolDashboard() {
           </div>
         </div>
 
-        {/* تقدم السنة الدراسية */}
+        {/* تقدم السنة الدراسية + الأهداف */}
         <div>
           <h3 className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">مسار الموسم الدراسي</h3>
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}
-            className="p-5 bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] h-[calc(100%-28px)] flex flex-col justify-center gap-4">
+            className="p-5 bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] flex flex-col gap-4">
 
-            {/* ── شريط الفصل الحالي ── */}
+            {/* شريط الفصل الحالي */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1.5">
@@ -408,10 +666,34 @@ function SchoolDashboard() {
               </div>
             </div>
 
-            {/* ── فاصل ── */}
+            {/* ── الأهداف المحققة (للمدير) ── */}
+            {isManager && achievedGoals.length > 0 && (
+              <>
+                <div className="h-px bg-gray-100 dark:bg-white/5" />
+                <div>
+                  <p className="text-xs font-black text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1">
+                    <Target className="w-3 h-3" /> الأهداف المحققة
+                  </p>
+                  <div className="space-y-1.5">
+                    {achievedGoals.map(({ label, done }) => (
+                      <div key={label} className={`flex items-center gap-2 text-xs font-medium rounded-lg px-2 py-1.5 ${
+                        done ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                             : "bg-gray-50 dark:bg-white/5 text-gray-400"
+                      }`}>
+                        {done
+                          ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          : <div className="w-3.5 h-3.5 rounded-full border-2 border-gray-300 shrink-0" />}
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
             <div className="h-px bg-gray-100 dark:bg-white/5" />
 
-            {/* ── شريط السنة كاملة ── */}
+            {/* شريط السنة كاملة */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1.5">
@@ -425,11 +707,9 @@ function SchoolDashboard() {
                 </span>
               </div>
               <div className="w-full h-2.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mb-1.5 relative">
-                {/* شرائح الفصول الأربعة داخل الشريط */}
                 {["#3b82f6", "#10b981", "#f59e0b", "#ef4444"].map((color, i) => (
                   <div key={i} className="absolute top-0 h-full w-[25%]" style={{ left: `${i * 25}%`, opacity: 0.15, background: color }} />
                 ))}
-                {/* فواصل بين الفصول */}
                 {[25, 50, 75].map(pos => (
                   <div key={pos} className="absolute top-0 h-full w-px bg-white/60" style={{ left: `${pos}%` }} />
                 ))}
@@ -483,7 +763,7 @@ function SchoolDashboard() {
           </motion.div>
         )}
 
-        {/* آخر النشاطات */}
+        {/* آخر النشاطات مع فلتر */}
         {!loading && recentLogs.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
             <div className="flex items-center justify-between mb-3">
@@ -492,14 +772,36 @@ function SchoolDashboard() {
                 عرض الكل <ArrowLeft className="w-3 h-3" />
               </Link>
             </div>
-            <div className="bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] divide-y divide-gray-100 dark:divide-white/5">
-              {recentLogs.map((log, i) => (
-                <div key={i} className="flex items-center gap-3 p-3.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-primary)] shrink-0" />
-                  <p className="flex-1 text-sm text-gray-700 dark:text-gray-300 font-medium leading-snug">{log.desc}</p>
-                  <span className="text-[11px] text-gray-400 shrink-0">{log.time}</span>
-                </div>
+
+            {/* فلتر النشاطات */}
+            <div className="flex gap-1.5 flex-wrap mb-2">
+              {logCategories.map(c => (
+                <button
+                  key={c.key}
+                  onClick={() => setLogFilter(c.key)}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                    logFilter === c.key
+                      ? "bg-[var(--color-primary)] text-white shadow-sm"
+                      : "bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 hover:bg-gray-200"
+                  }`}
+                >
+                  {c.label}
+                </button>
               ))}
+            </div>
+
+            <div className="bg-white dark:bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] divide-y divide-gray-100 dark:divide-white/5">
+              {filteredLogs.length === 0 ? (
+                <p className="text-center text-xs text-gray-400 py-6">لا توجد نشاطات في هذه الفئة</p>
+              ) : (
+                filteredLogs.map((log, i) => (
+                  <div key={i} className="flex items-center gap-3 p-3.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-primary)] shrink-0" />
+                    <p className="flex-1 text-sm text-gray-700 dark:text-gray-300 font-medium leading-snug">{log.desc}</p>
+                    <span className="text-[11px] text-gray-400 shrink-0">{log.time}</span>
+                  </div>
+                ))
+              )}
             </div>
           </motion.div>
         )}
