@@ -23,7 +23,11 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
-import MemorizationChart from "@/components/analytics/MemorizationChart";
+import dynamic from "next/dynamic";
+const MemorizationChart = dynamic(() => import("@/components/analytics/MemorizationChart"), { 
+  ssr: false, 
+  loading: () => <div className="h-64 w-full bg-gray-100 rounded-xl animate-pulse flex items-center justify-center text-gray-400 text-sm font-bold">جاري تحميل الرسم البياني...</div> 
+});
 
 // ─── حساب العمر ──────────────────────────────────────────
 

@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const { data: userData } = await supabase
           .from("users")
-          .select("*")
+          .select("id, email, display_name, role, school_id, group_name, is_active")
           .eq("id", session.user.id)
           .single();
 
@@ -87,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (userData.school_id) {
             const { data: schoolData } = await supabase
               .from("schools")
-              .select("*")
+              .select("id, name, city, country, director_name, email, phone, logo_url, season_start_date, settings, created_at, updated_at")
               .eq("id", userData.school_id)
               .single();
             if (mounted && schoolData) setSchool(mapSchool(schoolData));
@@ -154,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Refresh data natively
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
-      const { data: userData } = await supabase.from("users").select("*").eq("id", session.user.id).single();
+      const { data: userData } = await supabase.from("users").select("id, email, display_name, role, school_id, group_name, is_active").eq("id", session.user.id).single();
       if (userData) {
         setUser({
           id: userData.id,
@@ -165,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           groupName: userData.group_name,
         });
         if (userData.school_id) {
-          const { data: schoolData } = await supabase.from("schools").select("*").eq("id", userData.school_id).single();
+          const { data: schoolData } = await supabase.from("schools").select("id, name, city, country, director_name, email, phone, logo_url, season_start_date, settings, created_at, updated_at").eq("id", userData.school_id).single();
           if (schoolData) setSchool(mapSchool(schoolData));
         }
       }
@@ -184,7 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!session) return;
     const { data: userData } = await supabase.from("users").select("school_id").eq("id", session.user.id).single();
     if (userData?.school_id) {
-      const { data: schoolData } = await supabase.from("schools").select("*").eq("id", userData.school_id).single();
+      const { data: schoolData } = await supabase.from("schools").select("id, name, city, country, director_name, email, phone, logo_url, season_start_date, settings, created_at, updated_at").eq("id", userData.school_id).single();
       if (schoolData) setSchool(mapSchool(schoolData));
     }
   };

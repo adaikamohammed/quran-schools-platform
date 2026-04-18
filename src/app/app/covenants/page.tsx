@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import SchoolGuard from "@/components/layout/SchoolGuard";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -14,7 +14,8 @@ import {
   Filter, MoreHorizontal, Users
 } from "lucide-react";
 import { v4 as uuid } from "uuid";
-import { HintBulb } from "@/components/layout/HintBulb";
+import dynamic from "next/dynamic";
+const HintBulb = dynamic(() => import("@/components/layout/HintBulb").then(mod => mod.HintBulb), { ssr: false });
 
 // ─── الثوابت ─────────────────────────────────────────────
 

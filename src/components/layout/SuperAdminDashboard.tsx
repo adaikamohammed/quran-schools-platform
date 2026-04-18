@@ -12,7 +12,11 @@ import {
   BookOpen,
   AlertCircle,
 } from "lucide-react";
-import SchoolsRegistrationChart from "../analytics/SchoolsRegistrationChart";
+import dynamic from "next/dynamic";
+const SchoolsRegistrationChart = dynamic(() => import("../analytics/SchoolsRegistrationChart"), { 
+  ssr: false, 
+  loading: () => <div className="h-64 w-full bg-gray-100 rounded-xl animate-pulse flex items-center justify-center text-gray-400 text-sm font-bold">جاري تحميل الرسم البياني...</div> 
+});
 
 // ─── أنواع ─────────────────────────────────────────────────
 

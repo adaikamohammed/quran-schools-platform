@@ -862,7 +862,7 @@ function StudentsPage() {
       })) as any[]);
 
       // جلب الطلاب مباشرة من Supabase لضمان التحديث الفوري المباشر للحساب الإداري
-      let query = supabase.from("students").select("*").eq("school_id", school.id);
+      let query = supabase.from("students").select("id, school_id, teacher_id, group_name, full_name, gender, birth_date, educational_level, guardian_name, phone1, phone2, status, subscription_tier, memorized_surahs_count, daily_memorization_amount, registration_date, current_surah_id, created_at, updated_at").eq("school_id", school.id);
       
       if (selectedTeacherId !== "all") {
         query = query.eq("teacher_id", selectedTeacherId);
