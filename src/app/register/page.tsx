@@ -113,26 +113,93 @@ export default function RegisterPage() {
     }
   };
 
-  // ─── شاشة النجاح ──────────────────────────────────────────────────
+  // ─── شاشة النجاح (تصميم احترافي جديد) ──────────────────────────────
   if (submitted) {
     return (
       <div style={styles.page} dir="rtl">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.85 }}
-          animate={{ opacity: 1, scale: 1 }}
-          style={styles.successBox}
-        >
-          <div style={styles.successIcon}>
-            <CheckCircle2 size={52} color="#ffffff" />
-          </div>
-          <h1 style={styles.successTitle}>تم إرسال طلبك بنجاح 🎉</h1>
-          <p style={styles.successText}>
-            سيتم مراجعة طلبك من قبل إدارة المنصة في أقرب وقت. سيتم التواصل معك عبر الواتساب أو البريد الإلكتروني الذي أدخلته لتأكيد التفعيل، لذا يرجى التأكد من أن بريدك الإلكتروني يعمل.
-          </p>
-          <button onClick={() => router.replace("/")} style={styles.btnPrimary}>
-            العودة للرئيسية
-          </button>
-        </motion.div>
+        {/* خلفيات زخرفية مشابهة للرئيسية */}
+        <div style={styles.bgCircle1} />
+        <div style={styles.bgCircle2} />
+        <div style={{...styles.bgCircle3, background: "radial-gradient(circle, rgba(22,163,74,0.08) 0%, transparent 70%)"}} />
+
+        <div style={styles.container} className="justify-center items-center flex-1">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            style={{
+              background: "#ffffff",
+              borderRadius: "32px",
+              padding: "50px 40px",
+              width: "100%",
+              maxWidth: "520px",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(22, 163, 74, 0.1)",
+              textAlign: "center",
+              position: "relative",
+              overflow: "hidden"
+            }}
+          >
+            {/* طارة خضراء علوية كخلفية للأيقونة */}
+            <div style={{
+              position: "absolute", top: 0, left: 0, right: 0, height: "140px",
+              background: "linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)",
+              zIndex: 0
+            }} />
+
+            <div style={{ position: "relative", zIndex: 1 }}>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", delay: 0.2, stiffness: 200 }}
+                style={{
+                  width: "100px", height: "100px", margin: "0 auto 30px",
+                  background: "#ffffff", borderRadius: "50%",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 10px 25px -5px rgba(22, 163, 74, 0.2)"
+                }}
+              >
+                <div style={{
+                  width: "80px", height: "80px", borderRadius: "50%",
+                  background: "linear-gradient(135deg, #16a34a 0%, #15803d 100%)",
+                  display: "flex", alignItems: "center", justifyContent: "center"
+                }}>
+                  <CheckCircle2 size={44} color="#ffffff" strokeWidth={2.5} />
+                </div>
+              </motion.div>
+
+              <motion.h1 
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+                style={{ fontSize: "28px", fontWeight: 900, color: "#111827", marginBottom: "16px" }}
+              >
+                تم إرسال طلبك بنجاح! ✨
+              </motion.h1>
+
+              <motion.p
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+                style={{ fontSize: "16px", color: "#4b5563", lineHeight: 1.8, marginBottom: "32px", padding: "0 10px" }}
+              >
+                مرحباً بك في منصة المدارس القرآنية. سيتم مراجعة طلب مدرستك <strong style={{color: "#16a34a"}}>{form.schoolName}</strong> قريباً.
+                <br /><br />
+                سنقوم بالتواصل معك عبر الواتساب أو البريد الإلكتروني لتأكيد التفعيل وإرسال بيانات الدخول.
+              </motion.p>
+
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
+                <button 
+                  onClick={() => router.replace("/")}
+                  style={{
+                    background: "transparent", color: "#16a34a", fontSize: "16px", fontWeight: 800,
+                    border: "2px solid #16a34a", borderRadius: "14px", padding: "14px 32px",
+                    cursor: "pointer", transition: "all 0.2s", width: "100%", maxWidth: "250px",
+                  }}
+                  onMouseOver={(e) => { e.currentTarget.style.background = "#f0fdf4"; }}
+                  onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; }}
+                >
+                  العودة للرئيسية
+                </button>
+              </motion.div>
+            </div>
+          </motion.div>
+        </div>
       </div>
     );
   }

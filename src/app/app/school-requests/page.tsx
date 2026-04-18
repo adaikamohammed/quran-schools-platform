@@ -109,6 +109,67 @@ function ApproveModal({
   );
 }
 
+// ─── Modal رفض الطلب ────────────────────────────────────
+function RejectModal({
+  req,
+  onReject,
+  onClose,
+}: {
+  req: { id: string; school_name: string; director_name: string; };
+  onReject: (id: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handle = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      await onReject(req.id);
+    } catch (e: any) {
+      setError(e.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div key="rej-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        key="rej-modal"
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      >
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col items-center p-6 text-center">
+          <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4">
+            <XCircle className="w-8 h-8" />
+          </div>
+          <h3 className="font-black text-lg text-gray-900 mb-2">تأكيد الرفض</h3>
+          <p className="text-sm text-gray-500 mb-6">هل أنت متأكد أنك تريد رفض طلب التسجيل من مدرسة <strong className="text-gray-800">{req.school_name}</strong>؟</p>
+          
+          {error && (
+            <div className="p-3 mb-4 w-full bg-red-50 text-red-600 rounded-xl text-xs font-bold flex items-center justify-center gap-2">
+              <AlertTriangle className="w-4 h-4" /> {error}
+            </div>
+          )}
+
+          <div className="flex gap-3 w-full">
+            <button onClick={onClose} className="btn-secondary flex-1 py-3 justify-center text-sm">إلغاء</button>
+            <button onClick={handle} disabled={loading}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold shadow-md transition-colors disabled:opacity-50">
+              {loading ? <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : "نعم، ارفض الطلب"}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 // ─── الصفحة الرئيسية ──────────────────────────────────────
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-50 text-amber-700 border-amber-200",
@@ -129,6 +190,7 @@ export default function SchoolRequestsPage() {
   const [filterCountry, setFilterCountry] = useState("الكل");
   const [filterDate, setFilterDate] = useState("الكل");
   const [approvingReq, setApprovingReq] = useState<any | null>(null);
+  const [rejectingReq, setRejectingReq] = useState<any | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -186,12 +248,16 @@ export default function SchoolRequestsPage() {
   };
 
   const handleReject = async (id: string) => {
-    if (!confirm("هل أنت متأكد من رفض هذا الطلب؟")) return;
-    await fetch("/api/schools/approve", {
+    const res = await fetch("/api/schools/approve", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ requestId: id }),
     });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "فشل الرفض");
+    }
+    setRejectingReq(null);
     await load();
   };
 
@@ -312,7 +378,7 @@ export default function SchoolRequestsPage() {
                         className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-sm">
                         <CheckCircle2 className="w-3.5 h-3.5" /> قبول
                       </button>
-                      <button onClick={() => handleReject(req.id)}
+                      <button onClick={() => setRejectingReq(req)}
                         className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold transition-colors border border-red-100">
                         <XCircle className="w-3.5 h-3.5" /> رفض
                       </button>
@@ -350,6 +416,13 @@ export default function SchoolRequestsPage() {
           req={approvingReq}
           onApprove={(pw) => handleApprove(approvingReq, pw)}
           onClose={() => setApprovingReq(null)}
+        />
+      )}
+      {rejectingReq && (
+        <RejectModal
+          req={rejectingReq}
+          onReject={handleReject}
+          onClose={() => setRejectingReq(null)}
         />
       )}
     </div>

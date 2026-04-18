@@ -104,11 +104,11 @@ export default function Modal({
 
           {/* ── Scroll Container (so tall modals remain scrollable) ── */}
           <div
-            className="fixed inset-0 z-50 overflow-y-auto"
+            className="fixed inset-0 z-50 overflow-y-auto overscroll-contain"
             role="dialog"
             aria-modal="true"
           >
-            <div className="flex min-h-full items-center justify-center p-4 py-8">
+            <div className="flex min-h-[100dvh] items-center justify-center p-4 py-8">
               {/* ── Panel ── */}
               <motion.div
                 key="modal-panel"
@@ -161,7 +161,7 @@ export default function Modal({
                 )}
 
                 {/* ── Body ── */}
-                <div className="overflow-y-auto max-h-[calc(100vh-16rem)]">
+                <div className="overflow-y-auto max-h-[calc(100dvh-12rem)] overscroll-contain">
                   {children}
                 </div>
 

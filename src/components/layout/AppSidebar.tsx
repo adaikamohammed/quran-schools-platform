@@ -291,6 +291,7 @@ export default function AppSidebar({
       }
     });
     setOpenGroups(initial);
+    onClose();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
@@ -305,7 +306,7 @@ export default function AppSidebar({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden"
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm lg:hidden"
           />
         )}
       </AnimatePresence>
@@ -314,7 +315,7 @@ export default function AppSidebar({
       <aside
         id="app-sidebar"
         className={`
-          fixed top-0 right-0 h-full z-40 flex flex-col sidebar-transition
+          fixed top-0 right-0 h-full z-50 lg:z-40 flex flex-col sidebar-transition
           bg-white dark:bg-[#13161f] text-gray-800 dark:text-gray-200
           border-l border-[var(--color-border)] dark:border-white/8
           print:hidden

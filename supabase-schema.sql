@@ -365,3 +365,121 @@ ALTER TABLE public.school_requests ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Service role bypass" ON public.school_requests
   FOR ALL USING (true) WITH CHECK (true);
 
+-- ─── 16. إنشاء مدرسة وحساب المدير (RPC) ───────────────────────────────────
+-- ملاحظة: يتطلب إضافة إضافة pgcrypto
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE OR REPLACE FUNCTION public.create_school_with_principal(
+  p_school_name TEXT,
+  p_city TEXT,
+  p_country TEXT,
+  p_principal_name TEXT,
+  p_email TEXT,
+  p_password TEXT
+) RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_user_id UUID;
+  v_school_id UUID;
+  v_encrypted_pw TEXT;
+BEGIN
+  -- 1. توليد معرّف للمستخدم واستخراج الكلمة المشفرة
+  v_user_id := gen_random_uuid();
+  v_encrypted_pw := crypt(p_password, gen_salt('bf'));
+
+  -- 2. إدخال المستخدم في auth.users
+  INSERT INTO auth.users (
+    id,
+    instance_id,
+    aud,
+    role,
+    email,
+    encrypted_password,
+    email_confirmed_at,
+    raw_app_meta_data,
+    raw_user_meta_data,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    v_user_id,
+    '00000000-0000-0000-0000-000000000000',
+    'authenticated',
+    'authenticated',
+    p_email,
+    v_encrypted_pw,
+    now(),
+    '{"provider":"email","providers":["email"]}',
+    '{"role":"principal"}',
+    now(),
+    now()
+  );
+
+  -- 3. إدخال الهوية في auth.identities
+  INSERT INTO auth.identities (
+    id,
+    user_id,
+    identity_data,
+    provider,
+    provider_id,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    gen_random_uuid(),
+    v_user_id,
+    format('{"sub":"%s","email":"%s"}', v_user_id::text, p_email)::jsonb,
+    'email',
+    v_user_id::text,
+    now(),
+    now()
+  );
+
+  -- 4. إدخال المدرسة
+  INSERT INTO public.schools (
+    name,
+    city,
+    country,
+    owner_id,
+    plan,
+    director_name,
+    email
+  )
+  VALUES (
+    p_school_name,
+    p_city,
+    p_country,
+    v_user_id,
+    'free',
+    p_principal_name,
+    p_email
+  )
+  RETURNING id INTO v_school_id;
+
+  -- 5. إدخال المستخدم في public.users كمدير مدرسة
+  INSERT INTO public.users (
+    id,
+    school_id,
+    email,
+    display_name,
+    role
+  )
+  VALUES (
+    v_user_id,
+    v_school_id,
+    p_email,
+    p_principal_name,
+    'principal'
+  );
+
+  RETURN json_build_object(
+    'school_id', v_school_id,
+    'user_id', v_user_id
+  );
+EXCEPTION WHEN OTHERS THEN
+  RAISE EXCEPTION 'خطأ أثناء إنشاء المدرسة والمدير: %', SQLERRM;
+END;
+$$;
