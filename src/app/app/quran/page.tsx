@@ -316,6 +316,10 @@ function QuranPage() {
   const [showGoalEditor, setShowGoalEditor] = useState(false);
   const [currentTab, setCurrentTab] = useState<"hifz" | "tajweed">("hifz");
 
+  const [quickUpdateMode, setQuickUpdateMode] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedSurahIds, setSelectedSurahIds] = useState<Set<number>>(new Set());
+
   const TAJWEED_RULES: TajweedRule[] = [
     'أحكام النون الساكنة والتنوين',
     'أحكام الميم الساكنة',
@@ -427,15 +431,17 @@ function QuranPage() {
 
   // ─── حفظ تغيير حالة السورة ───────────────────────────────
 
-  const handleSaveSurahStatus = async (status: SurahStatus, notes?: string) => {
-    if (!selectedSurah || !selectedStudentId || !school?.id) return;
+  const handleSaveSurahStatus = async (status: SurahStatus, notes?: string, sId?: number, sName?: string) => {
+    const targetSurahId = sId ?? selectedSurah?.id;
+    const targetSurahName = sName ?? selectedSurah?.name;
+    if (!targetSurahId || !targetSurahName || !selectedStudentId || !school?.id) return;
     setSaving(true);
 
     await createOrUpdateSurahProgress({
       studentId: selectedStudentId,
       schoolId: school.id,
-      surahId: selectedSurah.id,
-      surahName: selectedSurah.name,
+      surahId: targetSurahId,
+      surahName: targetSurahName,
       status,
       notes,
       completionDate: (status === "محفوظة" || status === "مُتقنة")
@@ -446,7 +452,7 @@ function QuranPage() {
     // تحديث map محلياً
     const updatedMap = new Map(progressMap);
     const studentMap = new Map(updatedMap.get(selectedStudentId) ?? new Map());
-    studentMap.set(selectedSurah.id, status);
+    studentMap.set(targetSurahId, status);
     updatedMap.set(selectedStudentId, studentMap);
     setProgressMap(updatedMap);
 
@@ -457,6 +463,55 @@ function QuranPage() {
     await updateStudent(selectedStudentId, { memorizedSurahsCount: memorizedCount });
 
     setSaving(false);
+  };
+
+  const getNextStatus = (curr: SurahStatus): SurahStatus => {
+    if (curr === "غير محفوظة") return "قيد الحفظ";
+    if (curr === "قيد الحفظ") return "محفوظة";
+    if (curr === "محفوظة") return "مُتقنة";
+    return "غير محفوظة";
+  };
+
+  const handleQuickUpdate = async (surah: typeof surahs[number]) => {
+    const currentStatus = (selectedProgress.get(surah.id) ?? "غير محفوظة") as SurahStatus;
+    const nextSt = getNextStatus(currentStatus);
+    await handleSaveSurahStatus(nextSt, undefined, surah.id, surah.name);
+  };
+
+  const handleBulkUpdate = async (status: SurahStatus) => {
+    if (!selectedStudentId || !school?.id || selectedSurahIds.size === 0) return;
+    setSaving(true);
+
+    for (const id of Array.from(selectedSurahIds)) {
+      const sName = surahs.find(s => s.id === id)?.name || "";
+      await createOrUpdateSurahProgress({
+        studentId: selectedStudentId,
+        schoolId: school.id,
+        surahId: id,
+        surahName: sName,
+        status,
+        completionDate: (status === "محفوظة" || status === "مُتقنة")
+          ? new Date().toISOString().slice(0, 10)
+          : undefined,
+      });
+    }
+
+    const updatedMap = new Map(progressMap);
+    const studentMap = new Map(updatedMap.get(selectedStudentId) ?? new Map());
+    for (const id of Array.from(selectedSurahIds)) {
+      studentMap.set(id, status);
+    }
+    updatedMap.set(selectedStudentId, studentMap);
+    setProgressMap(updatedMap);
+
+    const memorizedCount = [...studentMap.values()].filter(
+      (s) => s === "محفوظة" || s === "مُتقنة"
+    ).length;
+    await updateStudent(selectedStudentId, { memorizedSurahsCount: memorizedCount });
+
+    setSaving(false);
+    setSelectedSurahIds(new Set());
+    setIsSelectionMode(false);
   };
 
   const currentSurahStatus = selectedSurah
@@ -699,6 +754,79 @@ function QuranPage() {
                 )}
               </div>
 
+              {/* أدوات الحفظ السريع / التحديد الجماعي */}
+              <div className="flex gap-2">
+                {isSelectionMode ? (
+                  <div className="flex bg-indigo-50 border border-indigo-200 rounded-xl p-1 items-center">
+                    <button
+                      onClick={() => {
+                        if (selectedSurahIds.size === filteredSurahs.length) {
+                          setSelectedSurahIds(new Set());
+                        } else {
+                          setSelectedSurahIds(new Set(filteredSurahs.map(s => s.id)));
+                        }
+                      }}
+                      className="px-2 py-1 text-xs font-bold text-indigo-700 bg-white rounded-lg shadow-sm border border-indigo-100 hover:bg-indigo-50"
+                    >
+                      {selectedSurahIds.size === filteredSurahs.length ? "إلغاء التحديد" : "تحديد الكل"}
+                    </button>
+                    
+                    <span className="text-xs font-bold text-indigo-700 mx-2 shrink-0">
+                      ({selectedSurahIds.size}) مختارة
+                    </span>
+
+                    <select
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleBulkUpdate(e.target.value as SurahStatus);
+                        }
+                      }}
+                      value=""
+                      className="px-2 py-1 text-xs font-bold bg-white text-indigo-700 border border-indigo-200 rounded-lg outline-none cursor-pointer"
+                    >
+                      <option value="">تطبيق حالة...</option>
+                      <option value="مُتقنة">مُتقنة</option>
+                      <option value="محفوظة">محفوظة</option>
+                      <option value="قيد الحفظ">قيد الحفظ</option>
+                      <option value="غير محفوظة">غير محفوظة</option>
+                    </select>
+
+                    <button
+                      onClick={() => {
+                        setIsSelectionMode(false);
+                        setSelectedSurahIds(new Set());
+                      }}
+                      className="p-1.5 text-indigo-400 hover:text-indigo-600 mr-1"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => {
+                        setQuickUpdateMode(v => !v);
+                        if (isSelectionMode) setIsSelectionMode(false);
+                      }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${quickUpdateMode ? "bg-amber-100 border-amber-300 text-amber-700 shadow-sm" : "bg-white border-gray-200 text-gray-500 hover:border-amber-300 hover:text-amber-700"}`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      تحديث سريع
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsSelectionMode(true);
+                        if (quickUpdateMode) setQuickUpdateMode(false);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-500 hover:border-indigo-300 hover:text-indigo-600 transition-all"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      تحديد جماعي
+                    </button>
+                  </>
+                )}
+              </div>
+
               {/* عرض */}
               <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
                 <button
@@ -773,16 +901,51 @@ function QuranPage() {
                         transition={{ duration: 0.15 }}
                       >
                         {viewMode === "grid" ? (
-                          <SurahBox
-                            surah={surah}
-                            status={status}
-                            onClick={() => setSelectedSurah(surah)}
-                            compact={false}
-                          />
+                          <div className="relative">
+                            <SurahBox
+                              surah={surah}
+                              status={status}
+                              onClick={() => {
+                                if (isSelectionMode) {
+                                  setSelectedSurahIds(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(surah.id)) next.delete(surah.id);
+                                    else next.add(surah.id);
+                                    return next;
+                                  });
+                                } else if (quickUpdateMode) {
+                                  handleQuickUpdate(surah);
+                                } else {
+                                  setSelectedSurah(surah);
+                                }
+                              }}
+                              compact={false}
+                            />
+                            {isSelectionMode && (
+                              <div className="absolute top-2 left-2 z-20 pointer-events-none">
+                                <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedSurahIds.has(surah.id) ? "bg-[var(--color-primary)] border-[var(--color-primary)]" : "bg-white/80 border-gray-300"}`}>
+                                  {selectedSurahIds.has(surah.id) && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         ) : (
                           // List view
                           <button
-                            onClick={() => setSelectedSurah(surah)}
+                            onClick={() => {
+                              if (isSelectionMode) {
+                                setSelectedSurahIds(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(surah.id)) next.delete(surah.id);
+                                  else next.add(surah.id);
+                                  return next;
+                                });
+                              } else if (quickUpdateMode) {
+                                handleQuickUpdate(surah);
+                              } else {
+                                setSelectedSurah(surah);
+                              }
+                            }}
                             className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all hover:shadow-sm ${
                               sConfig.bg
                             } ${sConfig.border}`}
@@ -797,6 +960,11 @@ function QuranPage() {
                               <p className={`text-xs opacity-60 ${sConfig.color}`}>{surah.verses} آية</p>
                             </div>
                             <Icon className={`w-4 h-4 ${sConfig.color}`} />
+                            {isSelectionMode && (
+                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${selectedSurahIds.has(surah.id) ? "bg-[var(--color-primary)] border-[var(--color-primary)]" : "bg-white/80 border-gray-300"}`}>
+                                {selectedSurahIds.has(surah.id) && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                              </div>
+                            )}
                           </button>
                         )}
                       </motion.div>

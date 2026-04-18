@@ -76,14 +76,19 @@ export default function Modal({
     return () => document.removeEventListener("keydown", handler);
   }, [open, onClose, preventClose]);
 
-  // Lock body scroll when open
+  // Lock body AND html scroll when open to prevent white bar from showing
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
     }
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    };
   }, [open]);
 
   return (
@@ -97,82 +102,82 @@ export default function Modal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+            style={{ zIndex: 9998 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
             onClick={preventClose ? undefined : onClose}
             aria-hidden="true"
           />
 
-          {/* ── Scroll Container (so tall modals remain scrollable) ── */}
+          {/* ── Centering wrapper — stays strictly within viewport ── */}
           <div
-            className="fixed inset-0 z-50 overflow-y-auto overscroll-contain"
+            style={{ zIndex: 9999 }}
+            className="fixed inset-0 flex items-center justify-center p-4"
             role="dialog"
             aria-modal="true"
+            onClick={preventClose ? undefined : onClose}
           >
-            <div className="flex min-h-[100dvh] items-center justify-center p-4 py-8">
-              {/* ── Panel ── */}
-              <motion.div
-                key="modal-panel"
-                ref={panelRef}
-                initial={{ opacity: 0, scale: 0.95, y: 16 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 16 }}
-                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                className={`relative w-full ${SIZE_CLASSES[size]} bg-white dark:bg-[var(--color-card)] rounded-3xl shadow-2xl border border-gray-100 dark:border-white/8 overflow-hidden ${className}`}
-                onClick={(e) => e.stopPropagation()}
-              >
+            {/* ── Panel ── */}
+            <motion.div
+              key="modal-panel"
+              ref={panelRef}
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              style={{ maxHeight: "calc(100dvh - 2rem)" }}
+              className={`relative w-full ${SIZE_CLASSES[size]} bg-white dark:bg-[var(--color-card)] rounded-3xl shadow-2xl border border-gray-100 dark:border-white/8 flex flex-col overflow-hidden ${className}`}
+              onClick={(e) => e.stopPropagation()}
+            >
 
-                {/* ── Header ── */}
-                {(title || icon) && (
-                  <div
-                    className={`sticky top-0 z-10 flex items-center justify-between gap-4 px-6 py-5 border-b border-gray-100 dark:border-white/8 bg-white dark:bg-[var(--color-card)] ${headerClassName}`}
-                  >
-                    <div className="flex items-center gap-4 min-w-0">
-                      {/* أيقونة أو صورة */}
-                      {icon && (
-                        <div className="shrink-0">{icon}</div>
+              {/* ── Header ── */}
+              {(title || icon) && (
+                <div
+                  className={`shrink-0 flex items-center justify-between gap-4 px-6 py-5 border-b border-gray-100 dark:border-white/8 bg-white dark:bg-[var(--color-card)] ${headerClassName}`}
+                >
+                  <div className="flex items-center gap-4 min-w-0">
+                    {icon && (
+                      <div className="shrink-0">{icon}</div>
+                    )}
+                    <div className="min-w-0">
+                      {title && (
+                        <h2
+                          className="text-xl font-black text-gray-900 dark:text-white leading-snug"
+                          style={{ fontFamily: "var(--font-headline)" }}
+                        >
+                          {title}
+                        </h2>
                       )}
-                      {/* نصوص */}
-                      <div className="min-w-0">
-                        {title && (
-                          <h2
-                            className="text-xl font-black text-gray-900 dark:text-white leading-snug"
-                            style={{ fontFamily: "var(--font-headline)" }}
-                          >
-                            {title}
-                          </h2>
-                        )}
-                        {description && (
-                          <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">
-                            {description}
-                          </p>
-                        )}
-                      </div>
+                      {description && (
+                        <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">
+                          {description}
+                        </p>
+                      )}
                     </div>
-
-                    {/* زر الإغلاق */}
-                    <button
-                      onClick={onClose}
-                      aria-label="إغلاق"
-                      className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-white/8 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/15 hover:text-gray-800 dark:hover:text-white transition-all shrink-0"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
                   </div>
-                )}
 
-                {/* ── Body ── */}
-                <div className="overflow-y-auto max-h-[calc(100dvh-12rem)] overscroll-contain">
-                  {children}
+                  {/* زر الإغلاق */}
+                  <button
+                    onClick={onClose}
+                    aria-label="إغلاق"
+                    className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-white/8 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/15 hover:text-gray-800 dark:hover:text-white transition-all shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
+              )}
 
-                {/* ── Footer ── */}
-                {footer && (
-                  <div className="sticky bottom-0 z-10 border-t border-gray-100 dark:border-white/8 bg-white dark:bg-[var(--color-card)] px-6 py-4">
-                    {footer}
-                  </div>
-                )}
-              </motion.div>
-            </div>
+              {/* ── Body — scrolls internally ── */}
+              <div className="flex-1 overflow-y-auto overscroll-contain">
+                {children}
+              </div>
+
+              {/* ── Footer ── */}
+              {footer && (
+                <div className="shrink-0 border-t border-gray-100 dark:border-white/8 bg-white dark:bg-[var(--color-card)] px-6 py-4">
+                  {footer}
+                </div>
+              )}
+            </motion.div>
           </div>
         </>
       )}

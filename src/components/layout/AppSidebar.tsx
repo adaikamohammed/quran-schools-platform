@@ -426,17 +426,24 @@ export default function AppSidebar({
               );
             }
 
-            /* ── EXPANDED MODE (SUPABASE STYLE FLYOUT) ── */
+            /* ── EXPANDED MODE ──
+               موبايل (isOpen=true):  أكورديون بروابط مباشرة — hover لا يعمل على اللمس
+               ديسكتوب (isOpen=false): flyout popup عند hover
+            ── */
             return (
-              <div 
-                key={group.title} 
+              <div
+                key={group.title}
                 className="mb-0.5 relative"
-                onMouseEnter={() => setHoveredGroup(group.title)}
-                onMouseLeave={() => setHoveredGroup(null)}
+                onMouseEnter={!isOpen ? () => setHoveredGroup(group.title) : undefined}
+                onMouseLeave={!isOpen ? () => setHoveredGroup(null) : undefined}
               >
                 {/* Group header */}
                 <div
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold transition-all duration-200 cursor-pointer
+                  role={isOpen ? "button" : undefined}
+                  tabIndex={isOpen ? 0 : undefined}
+                  onClick={() => isOpen && toggleGroup(group.title)}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold transition-all duration-200
+                    ${isOpen ? "cursor-pointer select-none" : "cursor-default"}
                     ${hasActive
                       ? "bg-[var(--color-primary)] text-white shadow-md shadow-[var(--color-primary)]/20"
                       : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/8 hover:text-gray-900 dark:hover:text-white"
@@ -444,22 +451,74 @@ export default function AppSidebar({
                 >
                   {FirstIcon && (
                     <FirstIcon
-                      className={`w-4 h-4 shrink-0 ${hasActive ? "text-white" : "text-gray-500 group-hover:text-gray-700"}`}
+                      className={`w-4 h-4 shrink-0 ${hasActive ? "text-white" : "text-gray-500"}`}
                     />
                   )}
                   <span className="flex-1 sidebar-label">{group.title}</span>
-                </div>
 
-                {/* Hover popup */}
-                <AnimatePresence>
-                  {isGroupHovered && (
-                    <HoverPopup
-                      group={group}
-                      pathname={pathname}
-                      onClose={onClose}
+                  {/* سهم الأكورديون — موبايل فقط */}
+                  {isOpen && (
+                    <ChevronRight
+                      className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200
+                        ${openGroups[group.title] ? "rotate-90" : ""}
+                        ${hasActive ? "text-white/70" : "text-gray-400"}`}
                     />
                   )}
+                </div>
+
+                {/* ── موبايل: روابط أكورديون مباشرة ── */}
+                <AnimatePresence initial={false}>
+                  {isOpen && openGroups[group.title] && (
+                    <motion.div
+                      key="accordion"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+                      className="overflow-hidden"
+                    >
+                      <div className="pt-1 pr-3 pb-1 space-y-0.5">
+                        {group.items.map((item) => {
+                          const active = isActive(item.href);
+                          const Icon = item.icon;
+                          return (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              onClick={onClose}
+                              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-200
+                                ${active
+                                  ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)] border border-[var(--color-primary)]/20"
+                                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/8 hover:text-gray-900 dark:hover:text-white"
+                                }`}
+                            >
+                              <Icon className={`w-4 h-4 shrink-0 ${active ? "text-[var(--color-primary)]" : ""}`} />
+                              <span>{item.label}</span>
+                              {item.badge && (
+                                <span className="mr-auto text-[9px] font-black bg-[var(--color-primary)] text-white px-1.5 py-0.5 rounded-full">
+                                  {item.badge}
+                                </span>
+                              )}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
                 </AnimatePresence>
+
+                {/* ── ديسكتوب: flyout popup عند hover ── */}
+                {!isOpen && (
+                  <AnimatePresence>
+                    {isGroupHovered && (
+                      <HoverPopup
+                        group={group}
+                        pathname={pathname}
+                        onClose={onClose}
+                      />
+                    )}
+                  </AnimatePresence>
+                )}
               </div>
             );
 
