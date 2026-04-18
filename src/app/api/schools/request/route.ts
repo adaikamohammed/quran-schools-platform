@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { sendNewSchoolNotification } from '@/lib/email';
 
 // ─── POST: أي شخص يقدم طلب تسجيل مدرسة ───────────────────────────────────
 export async function POST(request: Request) {
@@ -28,6 +29,16 @@ export async function POST(request: Request) {
       .single();
 
     if (error) throw error;
+
+    // إرسال إشعار للمدير العام
+    await sendNewSchoolNotification({
+      name: schoolName,
+      city,
+      country: country || 'الجزائر',
+      adminName: directorName,
+      adminEmail: email,
+      phone,
+    });
 
     return NextResponse.json({ success: true, id: data.id });
   } catch (error: any) {

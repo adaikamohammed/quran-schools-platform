@@ -3,13 +3,13 @@ import "./globals.css";
 import Providers from "./providers";
 
 export const metadata: Metadata = {
-  title: "منصة المدارس القرآنية | نظام إدارة الحلقات",
+  title: "منصة فرسان القرآن | نظام إدارة المدارس القرآنية",
   description:
-    "منصة رقمية متكاملة لإدارة المدارس القرآنية — تتبّع الحفظ، إدارة الطلاب، التقارير، والتواصل مع الأولياء، كل ذلك في مكان واحد.",
-  keywords: "مدارس قرآنية، تحفيظ القرآن، إدارة الحلقات، نظام إدارة",
-  authors: [{ name: "منصة المدارس القرآنية" }],
+    "منصة فرسان القرآن — منصة رقمية متكاملة لإدارة المدارس القرآنية، تتبّع الحفظ، إدارة الطلاب، التقارير، والتواصل مع الأولياء، كل ذلك في مكان واحد.",
+  keywords: "فرسان القرآن، مدارس قرآنية، تحفيظ القرآن، إدارة الحلقات، نظام إدارة",
+  authors: [{ name: "منصة فرسان القرآن" }],
   openGraph: {
-    title: "منصة المدارس القرآنية",
+    title: "منصة فرسان القرآن - لإدارة المدارس القرآنية",
     description: "نظام متكامل لإدارة المدارس القرآنية",
     type: "website",
     locale: "ar_DZ",
@@ -39,10 +39,10 @@ export default function RootLayout({
         {/* ─── PWA Meta Tags ─── */}
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#16a34a" />
-        <meta name="application-name" content="المدارس القرآنية" />
+        <meta name="application-name" content="فرسان القرآن" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="المدارس القرآنية" />
+        <meta name="apple-mobile-web-app-title" content="فرسان القرآن" />
         <meta name="mobile-web-app-capable" content="yes" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
 

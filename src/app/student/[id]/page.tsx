@@ -387,7 +387,7 @@ function StudentView({ student, sessions, surahProgress, timetable }: {
         )}
 
         <p className="text-center text-xs text-gray-300 pt-3 font-medium">
-          منصة المدارس القرآنية · {new Date().getFullYear()}
+          منصة فرسان القرآن · {new Date().getFullYear()}
         </p>
       </div>
     </div>

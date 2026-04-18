@@ -17,7 +17,7 @@ serwist.addEventListeners();
 // ─── Push Notifications Handler ─────────────────────────
 self.addEventListener("push", (event: PushEvent) => {
   const data = event.data?.json() ?? {};
-  const title: string = data.title ?? "منصة المدارس القرآنية";
+  const title: string = data.title ?? "منصة فرسان القرآن";
   const options = {
     body: data.body ?? "لديك إشعار جديد",
     icon: "/icons/icon-192x192.png",

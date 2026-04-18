@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -178,7 +179,7 @@ export default function RegisterPage() {
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
                 style={{ fontSize: "16px", color: "#4b5563", lineHeight: 1.8, marginBottom: "32px", padding: "0 10px" }}
               >
-                مرحباً بك في منصة المدارس القرآنية. سيتم مراجعة طلب مدرستك <strong style={{color: "#16a34a"}}>{form.schoolName}</strong> قريباً.
+                مرحباً بك في منصة فرسان القرآن. سيتم مراجعة طلب مدرستك <strong style={{color: "#16a34a"}}>{form.schoolName}</strong> قريباً.
                 <br /><br />
                 سنقوم بالتواصل معك عبر الواتساب أو البريد الإلكتروني لتأكيد التفعيل وإرسال بيانات الدخول.
               </motion.p>
@@ -222,11 +223,11 @@ export default function RegisterPage() {
         >
           {/* اللوجو */}
           <Link href="/" style={styles.logo}>
-            <div style={styles.logoIcon}>
-              <BookOpen size={28} color="#ffffff" />
+            <div style={{...styles.logoIcon, background: 'transparent', boxShadow: 'none', width: 'auto', height: 'auto'}}>
+              <Image src="/icons/icon-192x192.png" alt="فرسان القرآن" width={48} height={48} style={{objectFit: 'contain'}} />
             </div>
             <div>
-              <p style={styles.logoTitle}>منصة المدارس القرآنية</p>
+              <p style={styles.logoTitle}>منصة فرسان القرآن</p>
               <p style={styles.logoSub}>لكل مدرسة في العالم الإسلامي</p>
             </div>
           </Link>
@@ -269,11 +270,9 @@ export default function RegisterPage() {
           style={styles.formWrapper}
         >
           {/* شعار موبايل فقط */}
-          <Link href="/" style={{ ...styles.logo, display: "none", marginBottom: 20 }} className="mobile-logo">
-            <div style={styles.logoIcon}>
-              <BookOpen size={22} color="#ffffff" />
-            </div>
-            <p style={{ ...styles.logoTitle, fontSize: 16 }}>منصة المدارس القرآنية</p>
+          <Link href="/" style={{ ...styles.logo, display: "none", marginBottom: 20, alignItems: 'center' }} className="mobile-logo">
+            <Image src="/icons/icon-192x192.png" alt="فرسان القرآن" width={32} height={32} style={{objectFit: 'contain', marginLeft: 10}} />
+            <p style={{ ...styles.logoTitle, fontSize: 16 }}>منصة فرسان القرآن</p>
           </Link>
 
           <div style={styles.card}>

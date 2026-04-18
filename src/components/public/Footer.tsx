@@ -59,20 +59,20 @@ export default function Footer() {
           {/* Brand */}
           <div className="space-y-5">
             <Link href="/" className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 flex items-center justify-center shrink-0 shadow-md rounded-[12px] overflow-hidden">
+                <img src="/icons/icon-192x192.png" alt="شعار فرسان القرآن" className="w-full h-full object-cover scale-[1.03]" />
               </div>
               <div className="flex flex-col leading-tight">
                 <span className="font-black text-white" style={{ fontFamily: "var(--font-headline)" }}>
-                  منصة المدارس القرآنية
+                  منصة فرسان القرآن
                 </span>
                 <span className="text-xs text-[var(--color-primary)] opacity-80 font-bold">
-                  نظام إدارة الحلقات
+                  لإدارة المدارس القرآنية
                 </span>
               </div>
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed">
-              منصة رقمية متكاملة لإدارة المدارس القرآنية، تُمكّن المعلمين
+              منصة فرسان القرآن — منصة رقمية متكاملة لإدارة المدارس القرآنية، تُمكّن المعلمين
               والمديرين من متابعة الطلاب وخدمة كتاب الله بفعالية.
             </p>
             <div className="flex gap-3">
@@ -140,8 +140,8 @@ export default function Footer() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 font-medium mb-0.5">البريد الإلكتروني</p>
-                  <a href="mailto:info@quranschools.app" className="text-gray-300 text-sm hover:text-[var(--color-primary)] transition-colors">
-                    info@quranschools.app
+                  <a href="mailto:adaikamohamedali213213@gmail.com" className="text-gray-300 text-sm hover:text-[var(--color-primary)] transition-colors">
+                    adaikamohamedali213213@gmail.com
                   </a>
                 </div>
               </li>
@@ -151,7 +151,7 @@ export default function Footer() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 font-medium mb-0.5">الدعم الفني</p>
-                  <p className="text-gray-300 text-sm" dir="ltr">+213 6XX XXX XXX</p>
+                  <p className="text-gray-300 text-sm" dir="ltr">+213 673 28 28 19</p>
                 </div>
               </li>
               <li className="flex items-start gap-3">
@@ -171,7 +171,7 @@ export default function Footer() {
       {/* Bottom bar */}
       <div className="border-t border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500">
-          <p>© {new Date().getFullYear()} منصة المدارس القرآنية. جميع الحقوق محفوظة.</p>
+          <p>© {new Date().getFullYear()} منصة فرسان القرآن - لإدارة المدارس القرآنية. جميع الحقوق محفوظة.</p>
           <div className="flex gap-6">
             <a href="#" className="hover:text-white transition-colors">سياسة الخصوصية</a>
             <a href="#" className="hover:text-white transition-colors">شروط الاستخدام</a>

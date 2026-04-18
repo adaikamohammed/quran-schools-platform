@@ -12,9 +12,9 @@ import {
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "عن منصة المدارس القرآنية",
+  title: "عن منصة فرسان القرآن",
   description:
-    "تعرّف على قصة منصة المدارس القرآنية، رسالتنا، وهدفنا في خدمة تعليم القرآن الكريم.",
+    "تعرّف على قصة منصة فرسان القرآن، رسالتنا، وهدفنا في خدمة تعليم القرآن الكريم.",
 };
 
 const values = [
@@ -66,7 +66,7 @@ export default function AboutPage() {
               style={{ fontFamily: "var(--font-headline)" }}
             >
               عن {" "}
-              <span className="text-[var(--color-primary)]">منصة المدارس القرآنية</span>
+              <span className="text-[var(--color-primary)]">منصة فرسان القرآن</span>
             </h1>
             <p className="text-xl text-gray-500 leading-relaxed">
               منصة رقمية وُلدت من رحم الحاجة الفعلية لمدارس تحفيظ القرآن

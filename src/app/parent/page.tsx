@@ -223,7 +223,7 @@ export default function ParentPortalPage() {
 
         {/* تذييل */}
         <p className="text-center text-xs text-gray-300 mt-8 font-medium">
-          منصة المدارس القرآنية · للتواصل راجع إدارة المدرسة
+          منصة فرسان القرآن · للتواصل راجع إدارة المدرسة
         </p>
       </div>
     </div>

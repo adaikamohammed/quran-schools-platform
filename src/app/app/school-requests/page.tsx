@@ -387,7 +387,7 @@ export default function SchoolRequestsPage() {
                   
                   {req.status !== "pending" && (
                     <a 
-                      href={`mailto:${req.email}?subject=${encodeURIComponent(req.status === 'approved' ? 'تفعيل حساب مدرستكم في منصة المدارس القرآنية' : 'بخصوص طلب تسجيلكم في منصة المدارس القرآنية')}&body=${encodeURIComponent(req.status === 'approved' ? `السلام عليكم ورحمة الله وبركاته،\nالأستاذ الفاضل ${req.director_name}،\n\nنبارك لكم انضمام مدرستكم (${req.school_name}) إلى منصة المدارس القرآنية.\n\nبيانات الدخول الأولية الخاصة بكم:\nالبريد الإلكتروني: ${req.email}\nرابط المنصة: https://quran-schools.com\n\nيرجى التواصل معنا حال الحاجة لأي مساعدة.\nبالتوفيق.` : `السلام عليكم ورحمة الله وبركاته،\nالأستاذ الفاضل ${req.director_name}،\n\nنشكر لكم اهتمامكم بمنصة المدارس القرآنية، ولكن نعتذر عن قبول طلب تسجيل مدرستكم (${req.school_name}) في الوقت الحالي.\n\nللاستفسار يرجى الرد على هذا البريد.`)}`}
+                      href={`mailto:${req.email}?subject=${encodeURIComponent(req.status === 'approved' ? 'تفعيل حساب مدرستكم في منصة فرسان القرآن' : 'بخصوص طلب تسجيلكم في منصة فرسان القرآن')}&body=${encodeURIComponent(req.status === 'approved' ? `السلام عليكم ورحمة الله وبركاته،\nالأستاذ الفاضل ${req.director_name}،\n\nنبارك لكم انضمام مدرستكم (${req.school_name}) إلى منصة فرسان القرآن.\n\nبيانات الدخول الأولية الخاصة بكم:\nالبريد الإلكتروني: ${req.email}\nرابط المنصة: https://quran-schools.com\n\nيرجى التواصل معنا حال الحاجة لأي مساعدة.\nبالتوفيق.` : `السلام عليكم ورحمة الله وبركاته،\nالأستاذ الفاضل ${req.director_name}،\n\nنشكر لكم اهتمامكم بمنصة فرسان القرآن، ولكن نعتذر عن قبول طلب تسجيل مدرستكم (${req.school_name}) في الوقت الحالي.\n\nللاستفسار يرجى الرد على هذا البريد.`)}`}
                       className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-100 text-[10px] font-bold transition-colors"
                       target="_blank" rel="noopener noreferrer"
                     >
@@ -396,7 +396,7 @@ export default function SchoolRequestsPage() {
                   )}
                   {req.status !== "pending" && req.phone && (
                     <a 
-                      href={`https://wa.me/${req.phone.replace(/\D/g, '')}?text=${encodeURIComponent(req.status === 'approved' ? `السلام عليكم، تم الموافقة على انضمام مدرسة (${req.school_name}) لمنصة المدارس القرآنية ✅.` : `السلام عليكم، نعتذر عن قبول طلب انضمام مدرسة (${req.school_name}).`)}`}
+                      href={`https://wa.me/${req.phone.replace(/\D/g, '')}?text=${encodeURIComponent(req.status === 'approved' ? `السلام عليكم، تم الموافقة على انضمام مدرسة (${req.school_name}) لمنصة فرسان القرآن ✅.` : `السلام عليكم، نعتذر عن قبول طلب انضمام مدرسة (${req.school_name}).`)}`}
                       className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-green-50 hover:bg-green-100 text-green-700 border border-green-100 text-[10px] font-bold transition-colors"
                       target="_blank" rel="noopener noreferrer"
                     >

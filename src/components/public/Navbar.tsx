@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useEffect } from "react";
 import { Menu, X, BookOpen, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -35,18 +36,18 @@ export default function Navbar() {
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-3 group">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
-                <BookOpen className="w-6 h-6 text-white" />
+              <div className="w-11 h-11 shrink-0 drop-shadow-md group-hover:scale-105 transition-transform duration-300 rounded-[12px] overflow-hidden">
+                <Image src="/icons/icon-192x192.png" alt="فرسان القرآن" width={44} height={44} className="w-full h-full object-cover scale-[1.03]" />
               </div>
               <div className="flex flex-col leading-tight">
                 <span
                   className="text-[1.05rem] font-black text-gray-900"
                   style={{ fontFamily: "var(--font-headline)" }}
                 >
-                  منصة المدارس القرآنية
+                  منصة فرسان القرآن
                 </span>
                 <span className="text-xs font-bold text-[var(--color-primary)] opacity-80">
-                  نظام إدارة الحلقات
+                  لإدارة المدارس القرآنية
                 </span>
               </div>
             </Link>

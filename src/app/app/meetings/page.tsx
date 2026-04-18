@@ -294,7 +294,7 @@ function MeetingCard({ meeting, onDelete }: {
           `}
           
           <div style="margin-top: 50px; text-align: left; font-size: 12px; color: #9ca3af;">
-            طُبع من منصة مدارس القرآن بتاريخ ${new Date().toLocaleDateString('ar-DZ')}
+            طُبع من منصة فرسان القرآن بتاريخ ${new Date().toLocaleDateString('ar-DZ')}
           </div>
         </body>
       </html>

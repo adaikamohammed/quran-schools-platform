@@ -143,7 +143,7 @@ export default function SuperAdminDashboard({ displayName }: { displayName?: str
             <h2 className="text-2xl font-black mb-1" style={{ fontFamily: "var(--font-headline)" }}>
               أهلاً، {displayName?.split(" ")[0] ?? "مدير النظام"} 🛡️
             </h2>
-            <p className="text-white/80 text-sm">مركز التحكم الرئيسي — منصة مدارس القرآن</p>
+            <p className="text-white/80 text-sm">مركز التحكم الرئيسي — منصة فرسان القرآن</p>
             <p className="text-white/50 text-xs mt-2">📅 {hijriDate}</p>
           </div>
           <div className="flex items-center gap-2 bg-white/15 rounded-2xl px-4 py-3 shrink-0">

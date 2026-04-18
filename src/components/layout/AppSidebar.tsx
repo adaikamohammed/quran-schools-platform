@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
@@ -331,18 +332,15 @@ export default function AppSidebar({
         >
           {!isCollapsed && (
             <Link href="/app" className="flex items-center gap-3 group" onClick={onClose}>
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center shadow-md group-hover:shadow-[var(--color-primary)]/30 transition-shadow shrink-0">
-                {isSuperAdmin
-                  ? <Globe className="w-4.5 h-4.5 text-white" />
-                  : <BookOpen className="w-4.5 h-4.5 text-white" />
-                }
+              <div className="w-9 h-9 shrink-0 drop-shadow-sm group-hover:scale-105 transition-transform duration-300 rounded-[10px] overflow-hidden">
+                <Image src="/icons/icon-192x192.png" alt="فرسان القرآن" width={36} height={36} className="w-full h-full object-cover scale-[1.03]" />
               </div>
               <div className="leading-tight min-w-0">
                 <p
                   className="text-[0.85rem] font-black text-gray-900 dark:text-white truncate"
                   style={{ fontFamily: "var(--font-headline)" }}
                 >
-                  {isSuperAdmin ? "منصة المدارس" : (school?.name ?? "منصة المدارس")}
+                  {isSuperAdmin ? "فرسان القرآن" : (school?.name ?? "فرسان القرآن")}
                 </p>
                 <p className="text-[0.65rem] text-[var(--color-primary)] font-bold opacity-80">
                   {isSuperAdmin ? "إدارة النظام" : "إدارة الحلقات"}
@@ -352,11 +350,8 @@ export default function AppSidebar({
           )}
 
           {isCollapsed && (
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center shadow-md">
-              {isSuperAdmin
-                ? <Globe className="w-4.5 h-4.5 text-white" />
-                : <BookOpen className="w-4.5 h-4.5 text-white" />
-              }
+            <div className="w-9 h-9 shrink-0 drop-shadow-sm hover:scale-105 transition-transform duration-300 rounded-[10px] overflow-hidden">
+              <Image src="/icons/icon-192x192.png" alt="فرسان القرآن" width={36} height={36} className="w-full h-full object-cover scale-[1.03]" />
             </div>
           )}
 
@@ -386,7 +381,11 @@ export default function AppSidebar({
 
         {/* ── Nav Groups ── */}
         <nav
-          className={`flex-1 overflow-visible py-4 space-y-1 ${isCollapsed ? "px-2" : "px-3"}`}
+          className={`flex-1 py-4 space-y-1 ${isCollapsed ? "px-2" : "px-3"} ${
+            isOpen
+              ? "overflow-y-auto overscroll-contain"   /* موبايل: تمرير داخلي للأكورديون */
+              : "overflow-visible"                      /* ديسكتوب: flyout يتجاوز الحدود */
+          }`}
         >
           {filteredGroups.map((group) => {
             const isGroupHovered = hoveredGroup === group.title;

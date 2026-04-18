@@ -207,7 +207,7 @@ function buildDocumentHTML(
       </div>`;
   }
 
-  return `${header}<div class="content"><p>تم إصدار هذا النموذج من منصة مدارس القرآن.</p></div>`;
+  return `${header}<div class="content"><p>تم إصدار هذا النموذج من منصة فرسان القرآن.</p></div>`;
 }
 
 // ─── نافذة توليد الوثيقة ─────────────────────────────────

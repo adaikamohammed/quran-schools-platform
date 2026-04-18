@@ -30,9 +30,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (saved === "dark" || saved === "light") {
         setThemeState(saved);
       } else {
-        // كشف تفضيل النظام تلقائياً
-        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        setThemeState(prefersDark ? "dark" : "light");
+        // الاعتماد على الوضع الفاتح كأساسي
+        setThemeState("light");
       }
     } catch {
       // ignore

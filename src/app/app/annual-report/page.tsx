@@ -173,7 +173,7 @@ function PrintReport({ school, year, analytics, data }: {
             </div>
             <div style={{ textAlign: "center", background: "rgba(255,255,255,0.15)", borderRadius: 10, padding: "10px 16px" }}>
               <p style={{ fontSize: 28, fontWeight: 900, margin: 0 }}>📖</p>
-              <p style={{ fontSize: 10, opacity: 0.8, margin: "4px 0 0 0" }}>منصة المدارس القرآنية</p>
+              <p style={{ fontSize: 10, opacity: 0.8, margin: "4px 0 0 0" }}>منصة فرسان القرآن</p>
             </div>
           </div>
           <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.2)", display: "flex", gap: 24, fontSize: 11, opacity: 0.75 }}>
@@ -384,7 +384,7 @@ function PrintReport({ school, year, analytics, data }: {
 
         {/* Footer */}
         <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12, display: "flex", justifyContent: "space-between", fontSize: 9, color: "#9ca3af" }}>
-          <p style={{ margin: 0 }}>تم إنشاء هذا التقرير بواسطة منصة المدارس القرآنية • {today}</p>
+          <p style={{ margin: 0 }}>تم إنشاء هذا التقرير بواسطة منصة فرسان القرآن • {today}</p>
           <p style={{ margin: 0 }}>© {year} {school?.name} — جميع الحقوق محفوظة</p>
         </div>
       </div>

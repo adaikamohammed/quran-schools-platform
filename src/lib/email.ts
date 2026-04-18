@@ -6,7 +6,7 @@ function getResend(): Resend {
   return new Resend(process.env.RESEND_API_KEY ?? 'placeholder');
 }
 
-const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL ?? 'admin@quran.com';
+const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL ?? 'adaikamohamedali213213@gmail.com';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://quran-schools.vercel.app';
 
 /**
@@ -23,15 +23,15 @@ export async function sendNewSchoolNotification(school: {
 }): Promise<boolean> {
   try {
     const { error } = await getResend().emails.send({
-      from: 'منصة المدارس القرآنية <onboarding@resend.dev>',
+      from: 'منصة فرسان القرآن <onboarding@resend.dev>',
       to: ADMIN_EMAIL,
-      subject: `🆕 مدرسة جديدة انضمت: ${school.name}`,
+      subject: `📥 طلب تسجيل جديد: ${school.name}`,
       html: `
-      <div dir="rtl" style="font-family:Arial,sans-serif;max-width:520px;margin:auto;background:#f8fafc;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
+      <div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:auto;background:#f8fafc;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
         <div style="background:#065f46;padding:28px 24px;text-align:center;">
-          <div style="font-size:48px;margin-bottom:10px;">📖</div>
-          <h1 style="color:white;margin:0;font-size:22px;font-weight:800;">مدرسة قرآنية جديدة انضمت!</h1>
-          <p style="color:#6ee7b7;margin:6px 0 0;font-size:13px;">منصة المدارس القرآنية</p>
+          <div style="font-size:48px;margin-bottom:10px;">📥</div>
+          <h1 style="color:white;margin:0;font-size:22px;font-weight:800;">طلب انضمام مدرسة جديدة</h1>
+          <p style="color:#6ee7b7;margin:6px 0 0;font-size:13px;">بانتظار مراجعتك والموافقة عليه</p>
         </div>
         <div style="padding:28px;">
           <table style="width:100%;border-collapse:collapse;">
@@ -40,19 +40,19 @@ export async function sendNewSchoolNotification(school: {
             <tr><td style="padding:8px 0;color:#64748b;font-size:14px;">👤 المدير</td><td style="padding:8px 0;font-weight:bold;color:#0f172a;">${school.adminName}</td></tr>
             <tr><td style="padding:8px 0;color:#64748b;font-size:14px;">📧 الإيميل</td><td style="padding:8px 0;font-weight:bold;color:#0f172a;">${school.adminEmail}</td></tr>
             ${school.phone ? `<tr><td style="padding:8px 0;color:#64748b;font-size:14px;">📱 الهاتف</td><td style="padding:8px 0;font-weight:bold;color:#0f172a;">${school.phone}</td></tr>` : ''}
-            <tr><td style="padding:8px 0;color:#64748b;font-size:14px;">📅 التاريخ</td><td style="padding:8px 0;font-weight:bold;color:#0f172a;">${new Date().toLocaleString('ar-DZ')}</td></tr>
+            <tr><td style="padding:8px 0;color:#64748b;font-size:14px;">📅 تاريخ الطلب</td><td style="padding:8px 0;font-weight:bold;color:#0f172a;">${new Date().toLocaleString('ar-DZ')}</td></tr>
           </table>
-          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px;margin-top:16px;">
-            <p style="margin:0;color:#166534;font-size:14px;">✅ المدرسة مفعّلة تلقائياً ويمكن للمدير الدخول الآن.</p>
+          <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px;margin-top:16px;">
+            <p style="margin:0;color:#92400e;font-size:14px;">⏳ هذا الطلب بانتظار مراجعتك. يمكنك قبوله أو رفضه من لوحة التحكم.</p>
           </div>
           <div style="text-align:center;margin-top:20px;">
-            <a href="${APP_URL}/super-admin" style="display:inline-block;background:#065f46;color:white;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:14px;">
-              🔧 لوحة السوبر أدمن
+            <a href="${APP_URL}/app/school-requests" style="display:inline-block;background:#065f46;color:white;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:14px;">
+              🔍 مراجعة الطلب الآن
             </a>
           </div>
         </div>
         <div style="padding:16px;background:#f1f5f9;text-align:center;">
-          <p style="margin:0;color:#94a3b8;font-size:12px;">© ${new Date().getFullYear()} منصة المدارس القرآنية</p>
+          <p style="margin:0;color:#94a3b8;font-size:12px;">© ${new Date().getFullYear()} منصة فرسان القرآن - لإدارة المدارس القرآنية</p>
         </div>
       </div>`,
     });
@@ -76,14 +76,14 @@ export async function sendNewSchoolNotification(school: {
 export async function sendWelcomeEmail(to: string, name: string, schoolName: string): Promise<boolean> {
   try {
     const { error } = await getResend().emails.send({
-      from: 'منصة المدارس القرآنية <onboarding@resend.dev>',
+      from: 'منصة فرسان القرآن <onboarding@resend.dev>',
       to,
       subject: `🎉 أهلاً بمدرستك في منصتنا — ${schoolName}`,
       html: `
       <div dir="rtl" style="font-family:Arial,sans-serif;max-width:520px;margin:auto;background:#f8fafc;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
         <div style="background:#065f46;padding:28px 24px;text-align:center;">
           <div style="font-size:48px;margin-bottom:10px;">🕌</div>
-          <h1 style="color:white;margin:0;font-size:22px;font-weight:800;">أهلاً بك في منصة المدارس القرآنية</h1>
+          <h1 style="color:white;margin:0;font-size:22px;font-weight:800;">أهلاً بك في منصة فرسان القرآن</h1>
         </div>
         <div style="padding:28px;">
           <h2 style="margin:0 0 12px;color:#0f172a;font-size:18px;">مرحباً ${name} 👋</h2>
@@ -101,7 +101,7 @@ export async function sendWelcomeEmail(to: string, name: string, schoolName: str
           </div>
         </div>
         <div style="padding:16px;background:#f1f5f9;text-align:center;">
-          <p style="margin:0;color:#94a3b8;font-size:12px;">© ${new Date().getFullYear()} منصة المدارس القرآنية</p>
+          <p style="margin:0;color:#94a3b8;font-size:12px;">© ${new Date().getFullYear()} منصة فرسان القرآن - لإدارة المدارس القرآنية</p>
         </div>
       </div>`,
     });
