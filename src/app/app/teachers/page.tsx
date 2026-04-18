@@ -229,7 +229,7 @@ function TeachersPage() {
 
     const { data: usersData, error } = await supabase
       .from("users")
-      .select("id, email, display_name, role, school_id, group_name, phone, gender, photo_url, plain_password, is_active, created_at")
+      .select("*")
       .eq("school_id", user.schoolId)
       .eq("role", "teacher")
       .eq("is_active", true)

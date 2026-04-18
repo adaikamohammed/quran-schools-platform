@@ -1432,6 +1432,19 @@ function RegistrationsPage() {
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black border transition-all ${showStats ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]" : "bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-300"}`}>
             <BarChart3 className="w-3.5 h-3.5" /> تحليل
           </button>
+          {/* نسخ رابط التسجيل */}
+          <button 
+            onClick={() => {
+              const url = `${window.location.origin}/join/${school?.id || 'demo'}`;
+              navigator.clipboard.writeText(url);
+              alert("تم نسخ رابط التسجيل المخصص لمدرستك! انشره الآن لأولياء الأمور.");
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 transition-all"
+            title="نسخ رابط التسجيل لمشاركته"
+          >
+            <span className="text-lg leading-none transform -rotate-45">🔗</span> رابط التسجيل
+          </button>
+          
           {/* طباعة */}
           <button onClick={() => openPrintWindow(filtered, filterLabel, filterYear)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-300 transition-all">

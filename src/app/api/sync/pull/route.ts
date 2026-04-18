@@ -129,6 +129,18 @@ export async function GET(req: Request) {
       changes.push({ table: "systemNotifications", recordId: n.id, data: camelN, deletedAt: n.deleted_at })
     });
 
+    // 7. التسجيلات المبدئية (التسجيلات الجديدة)
+    const { data: preRegistrations } = await supabase
+      .from("pre_registrations")
+      .select("*")
+      .eq("school_id", schoolId)
+      .gt("updated_at", lastSyncAt);
+
+    preRegistrations?.forEach((r) => {
+      const camelR = convertKeysToCamel(r);
+      changes.push({ table: "registrations", recordId: r.id, data: camelR, deletedAt: r.deleted_at })
+    });
+
     return NextResponse.json({ success: true, changes });
   } catch (error) {
     console.error("Pull sync error:", error);

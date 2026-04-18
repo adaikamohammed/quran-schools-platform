@@ -241,7 +241,7 @@ function SchoolDashboard() {
         const supabaseClient = createClient();
         const { data: studentsData } = await supabaseClient
           .from("students")
-          .select("id, school_id, teacher_id, group_name, full_name, status, memorized_surahs_count")
+          .select("*")
           .eq("school_id", school.id);
           
         allStudents = (studentsData || []).map((s: any) => ({

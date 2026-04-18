@@ -309,7 +309,7 @@ function StudentRow({ student, record, onChange, sessionSurahId, enableTajweedTr
               </div>
 
               {/* السورة — إذا لم تكن موحّدة على مستوى الحصة */}
-              {!sessionSurahId && (
+              {!sessionSurahId && record.memorization !== "لم يحفظ" && (
                 <div>
                   <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2">السورة (فردي)</p>
                   <select
@@ -443,6 +443,189 @@ function StudentRow({ student, record, onChange, sessionSurahId, enableTajweedTr
   );
 }
 
+// ─── سطر الطالب (النمط المرحلي) ─────────────────────────
+
+interface PhasedStudentRowProps {
+  student: Student;
+  record: DailyRecord;
+  onChange: (patch: Partial<DailyRecord>) => void;
+  sessionSurahId?: number;
+  enableTajweedTracking?: boolean;
+  sessionNum: 1 | 2;
+  step: 1 | 2 | 3;
+}
+
+function PhasedStudentRow({ student, record, onChange, sessionSurahId, enableTajweedTracking, sessionNum, step }: PhasedStudentRowProps) {
+  const isAbsent = record.attendance === "غائب";
+
+  // المرحلة 1: الحضور فقط
+  if (step === 1) {
+    return (
+      <div className={`border-b border-gray-100 last:border-0 p-3 sm:p-4 hover:bg-gray-50/50 transition-colors ${
+        isAbsent ? "bg-red-50/40" : record.attendance ? "bg-emerald-50/30" : ""
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 w-full sm:w-1/3 min-w-0">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0 ${
+              isAbsent ? "bg-red-500" :
+              record.attendance === "حاضر" ? "bg-emerald-500" :
+              record.attendance === "متأخر" ? "bg-amber-500" :
+              record.attendance === "تعويض" ? "bg-blue-400" :
+              "bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)]"
+            }`}>
+              {student.fullName[0]}
+            </div>
+            <p className="font-bold text-sm text-gray-800 truncate leading-snug flex-1 sm:flex-none whitespace-normal sm:whitespace-nowrap">{student.fullName}</p>
+          </div>
+          
+          <div className="flex flex-wrap gap-2 sm:gap-1 w-full sm:w-auto h-auto min-h-0 shrink-0 mx-[-0.25rem] sm:mx-0 place-content-start">
+            {ATTENDANCE_OPTIONS.filter(opt => sessionNum !== 1 || opt.value !== "تعويض").map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  let patch: Partial<DailyRecord> = { attendance: opt.value };
+                  if (["حاضر", "متأخر", "تعويض"].includes(opt.value)) {
+                    if (!record.memorization) patch.memorization = "لم يحفظ";
+                  } else if (opt.value === "غائب") {
+                    patch.memorization = null; patch.behavior = null; patch.review = null;
+                  }
+                  onChange(patch);
+                }}
+                className={`flex-1 sm:flex-none min-w-[3.5rem] py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all ${
+                  record.attendance === opt.value
+                    ? `${opt.color} text-white shadow-md scale-100 sm:scale-105 ring-2 ring-offset-1 ring-${opt.color.replace('bg-', '')}`
+                    : "bg-gray-100/80 text-gray-500 hover:bg-gray-200"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // المرحلة 2: التسميع (تظهر فقط للحاضرين)
+  if (step === 2) {
+    if (isAbsent || !record.attendance) return null; // لا يظهر الغائب في التسميع
+    
+    return (
+      <div className="border-b border-gray-100 last:border-0 p-4 hover:bg-gray-50/50 transition-colors">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-8 h-8 rounded-lg bg-[var(--color-primary-light)] text-[var(--color-primary)] flex items-center justify-center font-black shrink-0">
+            {student.fullName[0]}
+          </div>
+          <p className="font-bold text-sm text-gray-800">{student.fullName}</p>
+        </div>
+
+        <div className="pl-11 space-y-4">
+          {/* اختيار السورة إذا لم تكن موحدة */}
+          {!sessionSurahId && record.memorization !== "لم يحفظ" && (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <select
+                value={record.surahId ?? ""}
+                onChange={(e) => onChange({ surahId: e.target.value ? +e.target.value : undefined })}
+                className="input-field text-sm py-2 flex-1 min-w-[140px]"
+              >
+                <option value="">— السورة —</option>
+                {surahs.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              {record.surahId && (
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <input
+                    type="number" min={1} value={record.fromVerse ?? ""}
+                    onChange={(e) => onChange({ fromVerse: +e.target.value })}
+                    placeholder="من آية" className="input-field py-2 text-sm text-center flex-1"
+                  />
+                  <span className="text-gray-400 self-center">→</span>
+                  <input
+                    type="number" min={1} value={record.toVerse ?? ""}
+                    onChange={(e) => onChange({ toVerse: +e.target.value })}
+                    placeholder="إلى آية" className="input-field py-2 text-sm text-center flex-1"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* التقييم */}
+          <div>
+            <div className="flex flex-wrap gap-1.5 mt-1 mx-[-0.25rem] sm:mx-0">
+              {MEMORIZATION_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => onChange({ memorization: opt.value })}
+                  className={`flex-1 sm:flex-none min-w-[3.5rem] py-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-black transition-all ${
+                    record.memorization === opt.value
+                      ? `${opt.color} shadow-sm sm:scale-105`
+                      : "bg-white border border-gray-200 text-gray-600 hover:border-gray-300"
+                  }`}
+                >
+                  {opt.emoji} <span className="hidden sm:inline">{opt.value}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // المرحلة 3: المراجعة والسلوك
+  if (step === 3) {
+    if (isAbsent || !record.attendance) return null;
+    
+    return (
+      <div className="border-b border-gray-100 last:border-0 p-4 hover:bg-gray-50/50 transition-colors">
+         <div className="flex items-center gap-3 mb-3">
+          <div className="w-8 h-8 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center font-black shrink-0">
+            {student.fullName[0]}
+          </div>
+          <p className="font-bold text-sm text-gray-800">{student.fullName}</p>
+        </div>
+
+        <div className="pl-11 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+            <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2">المراجعة</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => onChange({ review: true })}
+                className={`flex-1 py-2 rounded-xl text-xs font-black transition-all ${
+                  record.review === true ? "bg-emerald-500 text-white shadow-sm" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                }`}
+              >✓ تمت</button>
+              <button
+                onClick={() => onChange({ review: false })}
+                className={`flex-1 py-2 rounded-xl text-xs font-black transition-all ${
+                  record.review === false ? "bg-red-400 text-white shadow-sm" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                }`}
+              >✗ لم تتم</button>
+            </div>
+          </div>
+
+          <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+            <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2">السلوك</p>
+            <div className="flex gap-1.5 flex-wrap">
+              {BEHAVIOR_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => onChange({ behavior: record.behavior === opt.value ? "" : opt.value })}
+                  className={`flex-1 py-2 rounded-xl text-xs font-black transition-all ${
+                    record.behavior === opt.value ? "bg-gray-800 text-white shadow-sm" : `bg-gray-50 ${opt.color} hover:bg-gray-100`
+                  }`}
+                >{opt.label.split(" ")[0]}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 // ─── لوحة إعداد الحصة ────────────────────────────────────
 
 interface SessionSetupProps {
@@ -566,6 +749,19 @@ function SessionsPage() {
   const [sessionsList, setSessionsList] = useState<DailySession[]>([]);
   const [quickMode, setQuickMode] = useState(false);
 
+  const [inputMode, setInputMode] = useState<"classic" | "phased">("classic");
+  const [phasedStep, setPhasedStep] = useState<1 | 2 | 3>(1);
+
+  useEffect(() => {
+    const m = localStorage.getItem("qsp_inputMode");
+    if (m === "phased" || m === "classic") setInputMode(m);
+  }, []);
+
+  const handleInputModeChange = (m: "classic" | "phased") => {
+    setInputMode(m);
+    localStorage.setItem("qsp_inputMode", m);
+  };
+
   // إعداد الحصة
   const [sessionType, setSessionType] = useState<SessionType>("حصة أساسية");
   const [surahId, setSurahId] = useState<number | undefined>();
@@ -668,18 +864,53 @@ function SessionsPage() {
         setFromVerse(undefined);
         setToVerse(undefined);
         setAbsenceReason("");
-        // سجلات فارغة
+
+        // البحث في السجلات السابقة للحصول على آخر نقطة توقف
+        const allSessions = await db.sessions.where("teacherId").equals(selectedTeacherId).toArray();
+        allSessions.sort((a,b) => {
+          if (a.date === b.date) return b.sessionNumber - a.sessionNumber;
+          return b.date.localeCompare(a.date);
+        });
+        const pastSessions = allSessions.filter(s => {
+          if (s.date < selectedDate) return true;
+          if (s.date === selectedDate && s.sessionNumber < sessionNum) return true;
+          return false;
+        });
+
+        const getLastProgress = (sId: string) => {
+          for (const sess of pastSessions) {
+            if (!SESSION_TYPES_WITH_SURAH.includes(sess.sessionType)) continue;
+            const globalSurah = sess.surahId;
+            const globalToVs = sess.toVerse;
+
+            const rec = sess.records.find(r => r.studentId === sId);
+            if (rec && (rec.attendance === "حاضر" || rec.attendance === "متأخر" || rec.attendance === "تعويض")) {
+              if (rec.surahId) { 
+                return { surahId: rec.surahId, nextVerse: rec.toVerse ? rec.toVerse + 1 : undefined };
+              } else if (globalSurah) { 
+                return { surahId: globalSurah, nextVerse: globalToVs ? globalToVs + 1 : undefined };
+              }
+            }
+          }
+          return null;
+        };
+
+        // سجلات فارغة مدمج معها الاستمرار الذكي
         setRecords(
-          studs.map((s) => ({
-            studentId: s.id,
-            attendance: "" as AttendanceStatus,
-            memorization: null,
-            tajweedEvaluation: null,
-            review: null,
-            behavior: null,
-            notes: "",
-            surahId: s.currentSurahId,
-          }))
+          studs.map((s) => {
+            const last = getLastProgress(s.id);
+            return {
+              studentId: s.id,
+              attendance: "" as AttendanceStatus,
+              memorization: null,
+              tajweedEvaluation: null,
+              review: null,
+              behavior: null,
+              notes: "",
+              surahId: last ? last.surahId : s.currentSurahId,
+              fromVerse: last ? last.nextVerse : undefined,
+            };
+          })
         );
       }
 
@@ -1121,85 +1352,161 @@ function SessionsPage() {
                     </div>
                   </div>
 
-                  {/* شريط الأوضاع + الإجراءات الجماعية */}
-                  <div className="px-4 py-2.5 bg-white border-b border-gray-100 flex flex-wrap items-center gap-2">
-                    {/* وضع التسجيل السريع */}
-                    <button
-                      onClick={() => setQuickMode(q => !q)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all border ${
-                        quickMode
-                          ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm"
-                          : "bg-white text-gray-600 border-gray-200 hover:border-[var(--color-primary)]/30"
-                      }`}
-                    >
-                      <Zap className="w-3.5 h-3.5" />
-                      {quickMode ? "وضع سريع ✓" : "وضع سريع"}
-                    </button>
+                  {/* شريط الأوضاع والتبديل */}
+                  <div className="px-4 py-3 bg-white border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-xl w-fit border border-gray-200 shadow-sm">
+                      <button
+                        onClick={() => handleInputModeChange("phased")}
+                        className={`flex gap-1.5 items-center px-4 py-1.5 rounded-lg text-sm font-black transition-all ${
+                          inputMode === "phased" ? "bg-[var(--color-primary)] text-white shadow" : "text-gray-500 hover:text-gray-800"
+                        }`}
+                      >
+                       <Zap className="w-4 h-4" /> سير الحصة
+                      </button>
+                      <button
+                        onClick={() => handleInputModeChange("classic")}
+                        className={`flex gap-1.5 items-center px-4 py-1.5 rounded-lg text-sm font-black transition-all ${
+                          inputMode === "classic" ? "bg-white text-gray-800 shadow" : "text-gray-500 hover:text-gray-800"
+                        }`}
+                      >
+                       القائمة الكاملة
+                      </button>
+                    </div>
 
-                    <div className="w-px h-5 bg-gray-200" />
+                    {inputMode === "classic" && (
+                      <button
+                        onClick={() => setQuickMode(q => !q)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all border ${
+                          quickMode
+                            ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm"
+                            : "bg-white text-gray-600 border-gray-200 hover:border-[var(--color-primary)]/30"
+                        }`}
+                      >
+                        {quickMode ? "وضع مكثف ✓" : "وضع مكثف (حضور فقط)"}
+                      </button>
+                    )}
+                  </div>
 
-                    {/* إجراءات جماعية */}
-                    <button
-                      onClick={() => {
-                        setRecords(prev => prev.map(r => r.attendance === "" ? { ...r, attendance: "حاضر", memorization: r.memorization || "لم يحفظ" } : r));
-                        setSaved(false);
-                      }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-100"
-                    >
-                      ✓ تحضير الجميع
-                    </button>
-                    <button
-                      onClick={() => {
-                        setRecords(prev => prev.map(r => ["حاضر", "متأخر", "تعويض"].includes(r.attendance) ? { ...r, review: true } : r));
-                        setSaved(false);
-                      }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-black bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors border border-blue-100"
-                    >
-                      📖 مراجعة الجميع
-                    </button>
-                    <button
-                      onClick={() => {
-                        setRecords(prev => prev.map(r => ["حاضر", "متأخر", "تعويض"].includes(r.attendance) ? { ...r, behavior: "هادئ" } : r));
-                        setSaved(false);
-                      }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-black bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors border border-purple-100"
-                    >
-                      😊 هدوء الجميع
-                    </button>
-                    <button
-                      onClick={() => {
-                        setRecords(prev => prev.map(r => ["حاضر", "متأخر", "تعويض"].includes(r.attendance) && !r.memorization ? { ...r, memorization: "جيد" } : r));
-                        setSaved(false);
-                      }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-black bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors border border-amber-100"
-                    >
-                      ⭐ تسميع جيد للجميع
-                    </button>
+                  {/* تبويبات النمط المرحلي */}
+                  {inputMode === "phased" && (
+                    <div className="px-2 sm:px-4 pt-3 pb-0 bg-white border-b border-gray-100 mb-0 flex gap-2 overflow-x-auto hide-scrollbar">
+                      {[
+                         { step: 1, label: "✋ 1. التفقّد", desc: "تسجيل الحضور والغياب" },
+                         { step: 2, label: "📖 2. التسميع", desc: "تحديد السورة والتقييم" },
+                         { step: 3, label: "🔄 3. الخواتيم", desc: "المراجعة والسلوك" }
+                      ].map(s => (
+                        <button
+                          key={s.step}
+                          onClick={() => setPhasedStep(s.step as 1|2|3)}
+                          className={`flex-1 min-w-[120px] pb-3 border-b-2 text-right transition-all px-2 ${
+                            phasedStep === s.step 
+                              ? "border-[var(--color-primary)] opacity-100" 
+                              : "border-transparent opacity-40 hover:opacity-70"
+                          }`}
+                        >
+                          <p className={`text-sm tracking-tight font-black ${phasedStep === s.step ? "text-[var(--color-primary)]" : "text-gray-600"}`}>
+                            {s.label}
+                          </p>
+                          <p className="text-[10px] sm:text-xs font-bold text-gray-400 mt-0.5 truncate">{s.desc}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* الإجراءات الجماعية */}
+                  <div className="px-4 py-2 bg-gray-50/50 border-b border-gray-100 flex flex-wrap items-center gap-2">
+                    {/* إجراءات الحضور */}
+                    {(inputMode === "classic" || (inputMode === "phased" && phasedStep === 1)) && (
+                      <button
+                        onClick={() => {
+                          setRecords(prev => prev.map(r => r.attendance === "" ? { ...r, attendance: "حاضر", memorization: r.memorization || "لم يحفظ" } : r));
+                          setSaved(false);
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-100"
+                      >
+                        ✓ تحضير الجميع
+                      </button>
+                    )}
+
+                    {/* إجراءات التسميع */}
+                    {(inputMode === "classic" || (inputMode === "phased" && phasedStep === 2)) && (
+                      <button
+                        onClick={() => {
+                          setRecords(prev => prev.map(r => ["حاضر", "متأخر", "تعويض"].includes(r.attendance) && !r.memorization ? { ...r, memorization: "جيد" } : r));
+                          setSaved(false);
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-black bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors border border-amber-100"
+                      >
+                        ⭐ تسميع جيد للجميع
+                      </button>
+                    )}
+
+                    {/* إجراءات المراجعة والسلوك */}
+                    {(inputMode === "classic" || (inputMode === "phased" && phasedStep === 3)) && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setRecords(prev => prev.map(r => ["حاضر", "متأخر", "تعويض"].includes(r.attendance) ? { ...r, review: true } : r));
+                            setSaved(false);
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-black bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors border border-blue-100"
+                        >
+                          📖 مراجعة الجميع
+                        </button>
+                        <button
+                          onClick={() => {
+                            setRecords(prev => prev.map(r => ["حاضر", "متأخر", "تعويض"].includes(r.attendance) ? { ...r, behavior: "هادئ" } : r));
+                            setSaved(false);
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-black bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors border border-purple-100"
+                        >
+                          😊 هدوء الجميع
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   {/* الطلاب */}
-                  {students.map((student) => {
-                    const rec = records.find((r: DailyRecord) => r.studentId === student.id) ?? {
-                      studentId: student.id,
-                      attendance: "" as AttendanceStatus,
-                      memorization: null,
-                      tajweedEvaluation: null,
-                      review: null,
-                      behavior: null,
-                    };
-                    return (
-                      <StudentRow
-                        key={student.id}
-                        student={student}
-                        record={rec}
-                        onChange={(patch) => updateRecord(student.id, patch)}
-                        sessionSurahId={surahId}
-                        enableTajweedTracking={school?.settings?.enableTajweedTracking ?? false}
-                        sessionNum={sessionNum}
-                        quickMode={quickMode}
-                      />
-                    );
-                  })}
+                  <div className="divide-y divide-gray-100 pb-20">
+                    {students.map((student) => {
+                      const rec = records.find((r: DailyRecord) => r.studentId === student.id) ?? {
+                        studentId: student.id,
+                        attendance: "" as AttendanceStatus,
+                        memorization: null,
+                        tajweedEvaluation: null,
+                        review: null,
+                        behavior: null,
+                      };
+                      
+                      if (inputMode === "phased") {
+                        return (
+                          <PhasedStudentRow
+                            key={student.id}
+                            student={student}
+                            record={rec}
+                            onChange={(patch) => updateRecord(student.id, patch)}
+                            sessionSurahId={surahId}
+                            enableTajweedTracking={school?.settings?.enableTajweedTracking ?? false}
+                            sessionNum={sessionNum}
+                            step={phasedStep}
+                          />
+                        );
+                      }
+
+                      return (
+                        <StudentRow
+                          key={student.id}
+                          student={student}
+                          record={rec}
+                          onChange={(patch) => updateRecord(student.id, patch)}
+                          sessionSurahId={surahId}
+                          enableTajweedTracking={school?.settings?.enableTajweedTracking ?? false}
+                          sessionNum={sessionNum}
+                          quickMode={quickMode}
+                        />
+                      );
+                    })}
+                  </div>
 
                   {/* Bar الحضور المُحسَّن */}
                   {stats.filled > 0 && (
@@ -1256,34 +1563,35 @@ function SessionsPage() {
             </>
           )}
 
-          {/* ─── أزرار الحفظ والإجراءات ─── */}
-          <div className="flex gap-3 flex-wrap">
-            {/* حفظ */}
-            <button
-              onClick={handleSave}
-              disabled={saving || !canSave}
-              className="btn-primary flex-1 sm:flex-none justify-center py-3 text-sm"
-            >
-              {saving ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> جارٍ الحفظ...</>
-              ) : saved ? (
-                <><CheckCircle2 className="w-4 h-4" /> تم الحفظ</>
-              ) : (
-                <><Save className="w-4 h-4" /> حفظ الحصة</>
+          {/* ─── أزرار الحفظ والإجراءات (Sticky Footer) ─── */}
+          <div className="fixed bottom-0 left-0 right-0 sm:static sm:bottom-auto sm:left-auto sm:right-auto bg-white/90 sm:bg-transparent border-t border-gray-200 sm:border-0 p-4 sm:p-0 z-40 backdrop-blur-md shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)] sm:shadow-none">
+            <div className="max-w-4xl mx-auto flex gap-3 flex-col-reverse sm:flex-row flex-wrap">
+              {/* WhatsApp */}
+              {stats.filled > 0 && (
+                <button
+                  onClick={handleWhatsApp}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 text-sm font-bold transition-colors"
+                >
+                  <MessageSquare className="w-5 h-5 text-emerald-500" />
+                  <span className="inline">نسخ تقرير WhatsApp</span>
+                </button>
               )}
-            </button>
-
-            {/* WhatsApp */}
-            {stats.filled > 0 && (
+              
+              {/* حفظ */}
               <button
-                onClick={handleWhatsApp}
-                className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition-colors"
+                onClick={handleSave}
+                disabled={saving || !canSave}
+                className="w-full sm:flex-1 btn-primary justify-center py-4 text-base shadow-lg shadow-[var(--color-primary)]/20"
               >
-                <MessageSquare className="w-4 h-4" />
-                <span className="hidden sm:inline">نسخ تقرير WhatsApp</span>
-                <span className="sm:hidden">WhatsApp</span>
+                {saving ? (
+                  <><Loader2 className="w-5 h-5 animate-spin" /> جارٍ الحفظ...</>
+                ) : saved ? (
+                  <><CheckCircle2 className="w-5 h-5" /> تمت مزامنة الحصة</>
+                ) : (
+                  <><Save className="w-5 h-5" /> حفظ السجل وإنهاء الحصة</>
+                )}
               </button>
-            )}
+            </div>
           </div>
 
           {/* تنبيه الحفظ */}
