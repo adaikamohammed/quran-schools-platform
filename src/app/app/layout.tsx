@@ -80,6 +80,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // غير مسجّل → لا تعرض شيئاً (جارٍ التوجيه)
   if (!user) return null;
 
+  return (
     <SoundProvider>
       <div
         className="flex h-screen bg-[var(--color-background)] overflow-hidden transition-colors duration-300"
