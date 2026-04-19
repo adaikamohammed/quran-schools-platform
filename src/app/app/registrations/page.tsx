@@ -796,6 +796,7 @@ function StatusModal({ reg, schoolId, onSave, onClose }: {
   const [teachers, setTeachers] = useState<AppUser[]>([]);
   const [enroll, setEnroll] = useState({
     teacherId: "",
+    teacherName: "",
     groupName: "",
     subscriptionTier: "فئة الأصاغر" as SubscriptionTier,
     dailyMemorizationAmount: "ربع" as MemorizationAmount,
@@ -867,34 +868,31 @@ function StatusModal({ reg, schoolId, onSave, onClose }: {
             <p className="text-sm font-black text-gray-800">تحديد فوج الطالب <span className="text-red-500">*</span></p>
           </div>
 
-          {/* الشيخ */}
+          {/* الشيخ والفوج */}
           <div className="space-y-1">
-            <label className="text-xs font-black text-gray-500 uppercase tracking-wider">الشيخ / المعلم *</label>
+            <label className="text-xs font-black text-gray-500 uppercase tracking-wider">المعلم والفوج القرآني *</label>
             <select
               value={enroll.teacherId}
-              onChange={e => setEnroll(p => ({ ...p, teacherId: e.target.value }))}
+              onChange={e => {
+                const tid = e.target.value;
+                const t = teachers.find(x => x.id === tid);
+                setEnroll(p => ({ 
+                  ...p, 
+                  teacherId: tid, 
+                  teacherName: t?.displayName || "",
+                  groupName: t?.groupName || "بدون فوج" 
+                }));
+              }}
               className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:border-[var(--color-primary)]/60"
             >
-              <option value="">اختر المعلم...</option>
-              {teachers.map(t => <option key={t.id} value={t.id}>{t.displayName}</option>)}
+              <option value="">اختر المعلم (الفوج)...</option>
+              {teachers.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.displayName} ({t.groupName || "بدون فوج"})
+                </option>
+              ))}
             </select>
-            {!enroll.teacherId && <p className="text-[10px] text-red-500 font-bold">الشيخ إجباري لإلحاق الطالب</p>}
-          </div>
-
-          {/* الفوج */}
-          <div className="space-y-1">
-            <label className="text-xs font-black text-gray-500 uppercase tracking-wider">الفوج القرآني *</label>
-            <input
-              value={enroll.groupName}
-              onChange={e => setEnroll(p => ({ ...p, groupName: e.target.value }))}
-              list="enroll-groups-list"
-              placeholder="مثال: فوج النور"
-              className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:border-[var(--color-primary)]/60"
-            />
-            <datalist id="enroll-groups-list">
-              {existingGroups.map(g => <option key={g} value={g} />)}
-            </datalist>
-            {!enroll.groupName && <p className="text-[10px] text-red-500 font-bold">اسم الفوج إجباري</p>}
+            {(!enroll.teacherId || !enroll.groupName) && <p className="text-[10px] text-red-500 font-bold">المعلم والفوج إجباري لإلحاق الطالب</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -934,6 +932,7 @@ function StatusModal({ reg, schoolId, onSave, onClose }: {
 
 export interface EnrollData {
   teacherId: string;
+  teacherName: string;
   groupName: string;
   subscriptionTier: SubscriptionTier;
   dailyMemorizationAmount: MemorizationAmount;
@@ -1334,7 +1333,6 @@ function RegistrationsPage() {
   const handleStatusChange = async (id: string, status: PreRegistrationStatus, enrollData?: EnrollData) => {
     setUpdating(id);
     const reg = registrations.find(r => r.id === id);
-    await updateRegistrationStatus(id, status, user?.id);
 
     // إذا انضم المرشح → أنشئ حساب طالب رسمي
     if (status === "تم الإنضمام" && enrollData && reg && school?.id) {
@@ -1365,9 +1363,25 @@ function RegistrationsPage() {
           reason: "إلحاق جديد من قائمة التسجيلات",
         }],
       });
+
+      // حفظ بيانات الفوج في الملاحظات ليقرأها المدير لاحقاً
+      let newNotes = reg.notes || "";
+      const syncMsg = `\n[تنبيه النظام: أُلحِق بفضيلة الشيخ ${enrollData.teacherName} (${enrollData.groupName})]`;
+      if (!newNotes.includes(`أُلحِق بفضيلة الشيخ ${enrollData.teacherName}`)) {
+        newNotes += syncMsg;
+      }
+      await updateRegistrationData(id, { status, notes: newNotes.trim() });
+    } else {
+      await updateRegistrationStatus(id, status, user?.id);
     }
 
-    setRegistrations((prev) => prev.map((r) => r.id === id ? { ...r, status } : r));
+    setRegistrations((prev) => prev.map((r) => r.id === id ? { 
+      ...r, 
+      status, 
+      notes: (status === "تم الإنضمام" && enrollData) 
+        ? ((r.notes || "") + `\n[تنبيه النظام: أُلحِق بفضيلة الشيخ ${enrollData.teacherName} (${enrollData.groupName})]`).trim() 
+        : r.notes 
+    } : r));
     setUpdating(null);
 
     // التشغيل الصوتي
