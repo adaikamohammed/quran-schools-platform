@@ -559,8 +559,8 @@ function RegFormFields({ form, onChange, isEdit }: {
   return (
     <div className="space-y-5">
       {/* اسم + جنس */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="col-span-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="sm:col-span-2">
           <label className="label-xs">الاسم الكامل *</label>
           <input value={form.fullName} onChange={(e) => onChange("fullName", e.target.value)}
             className="input-field text-sm mt-1.5" placeholder="الاسم الكامل للطالب" />
@@ -580,7 +580,7 @@ function RegFormFields({ form, onChange, isEdit }: {
       </div>
 
       {/* ولي الأمر + هواتف */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <label className="label-xs">ولي الأمر</label>
           <input value={form.guardianName} onChange={(e) => onChange("guardianName", e.target.value)}
@@ -599,10 +599,24 @@ function RegFormFields({ form, onChange, isEdit }: {
       </div>
 
       {/* تاريخ الميلاد */}
-      <div>
-        <label className="label-xs">تاريخ الميلاد</label>
-        <input type="date" value={form.birthDate} onChange={(e) => onChange("birthDate", e.target.value)}
-          className="input-field text-sm mt-1.5 max-w-xs" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="label-xs">تاريخ الميلاد</label>
+          <input type="date" value={form.birthDate} onChange={(e) => onChange("birthDate", e.target.value)}
+            className="input-field text-sm mt-1.5 w-full" />
+        </div>
+        <div>
+          <label className="label-xs">أو أدخل العمر (يُحسب التاريخ تلقائياً)</label>
+          <input type="number" placeholder="مثال: 10" min="4" max="80"
+            onChange={(e) => {
+              const age = parseInt(e.target.value);
+              if (age > 0) {
+                const year = new Date().getFullYear() - age;
+                onChange("birthDate", `${year}-01-01`);
+              }
+            }}
+            className="input-field text-sm mt-1.5 w-full" />
+        </div>
       </div>
 
       {/* المستوى الدراسي */}
@@ -972,10 +986,11 @@ function BulkStatusModal({ count, onSave, onClose }: {
 // ──────────────────────────────────────────────────────────
 // عرض البطاقات
 // ──────────────────────────────────────────────────────────
-function CardsView({ items, updating, onStatusModal, onEditModal, selectedIds, onSelectId }: {
+function CardsView({ items, updating, onStatusModal, onEditModal, onViewModal, selectedIds, onSelectId }: {
   items: PreRegistration[]; updating: string | null;
   onStatusModal: (r: PreRegistration) => void;
   onEditModal: (r: PreRegistration) => void;
+  onViewModal: (r: PreRegistration) => void;
   selectedIds: string[]; onSelectId: (id: string) => void;
 }) {
   return (
@@ -993,13 +1008,13 @@ function CardsView({ items, updating, onStatusModal, onEditModal, selectedIds, o
                 {isSel && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
               </button>
               {/* أفاتار */}
-              <div className={`w-12 h-12 rounded-2xl shrink-0 overflow-hidden ${!reg.photoURL ? (reg.gender === "أنثى" ? "bg-gradient-to-br from-pink-400 to-rose-500" : "bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)]") : ""}`}>
+              <div onClick={() => onViewModal(reg)} className={`w-12 h-12 rounded-2xl shrink-0 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity ${!reg.photoURL ? (reg.gender === "أنثى" ? "bg-gradient-to-br from-pink-400 to-rose-500" : "bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)]") : ""}`}>
                 {reg.photoURL ? <img src={reg.photoURL} alt="" className="w-full h-full object-cover" />
                   : <div className="w-full h-full flex items-center justify-center text-white font-black text-lg">{reg.fullName[0]}</div>}
               </div>
               {/* بيانات */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
+                <div onClick={() => onViewModal(reg)} className="flex items-center gap-2 flex-wrap mb-1 cursor-pointer hover:text-[var(--color-primary)] transition-colors inline-flex">
                   <p className="text-base font-black text-gray-800">{reg.fullName}</p>
                   <span className="text-xs text-gray-400">{reg.gender}</span>
                   {reg.educationalLevel && <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{reg.educationalLevel}</span>}
@@ -1044,10 +1059,11 @@ function CardsView({ items, updating, onStatusModal, onEditModal, selectedIds, o
 // ──────────────────────────────────────────────────────────
 type SortKey = "fullName" | "phone1" | "educationalLevel" | "status" | "requestedAt" | "guardianName";
 
-function TableView({ items, updating, onStatusModal, onEditModal, selectedIds, onSelectId, onSelectAll }: {
+function TableView({ items, updating, onStatusModal, onEditModal, onViewModal, selectedIds, onSelectId, onSelectAll }: {
   items: PreRegistration[]; updating: string | null;
   onStatusModal: (r: PreRegistration) => void;
   onEditModal: (r: PreRegistration) => void;
+  onViewModal: (r: PreRegistration) => void;
   selectedIds: string[]; onSelectId: (id: string) => void; onSelectAll: () => void;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("requestedAt");
@@ -1113,13 +1129,13 @@ function TableView({ items, updating, onStatusModal, onEditModal, selectedIds, o
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-400 font-bold">{idx + 1}</td>
                   <td className="px-4 py-3">
-                    <div className={`w-9 h-9 rounded-xl overflow-hidden ${!reg.photoURL ? (reg.gender === "أنثى" ? "bg-gradient-to-br from-pink-400 to-rose-500" : "bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)]") : ""}`}>
+                    <div onClick={() => onViewModal(reg)} className={`w-9 h-9 rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-opacity ${!reg.photoURL ? (reg.gender === "أنثى" ? "bg-gradient-to-br from-pink-400 to-rose-500" : "bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)]") : ""}`}>
                       {reg.photoURL ? <img src={reg.photoURL} alt="" className="w-full h-full object-cover" />
                         : <div className="w-full h-full flex items-center justify-center text-white font-black text-sm">{reg.fullName[0]}</div>}
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    <p className="text-sm font-black text-gray-800">{reg.fullName}</p>
+                  <td className="px-4 py-3 cursor-pointer hover:bg-gray-50/50 transition-colors" onClick={() => onViewModal(reg)}>
+                    <p className="text-sm font-black text-gray-800 hover:text-[var(--color-primary)] transition-colors">{reg.fullName}</p>
                     <p className="text-xs text-gray-400">{reg.gender}</p>
                   </td>
                   <td className="px-4 py-3">
@@ -1292,6 +1308,7 @@ function RegistrationsPage() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [statusModal, setStatusModal] = useState<PreRegistration | null>(null);
   const [editModal, setEditModal] = useState<PreRegistration | null>(null);
+  const [viewModal, setViewModal] = useState<PreRegistration | null>(null);
   const [bulkModal, setBulkModal] = useState(false);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<PreRegistrationStatus | "الكل">("الكل");
@@ -1493,6 +1510,23 @@ function RegistrationsPage() {
         )}
       </AnimatePresence>
 
+      {/* ── دليل الحالات ── */}
+      <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 text-sm text-gray-700">
+        <h3 className="font-black text-indigo-900 mb-3 flex items-center gap-2">
+          <span className="text-xl">💡</span> دليل حالات التسجيل
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <div><strong className="text-amber-700">⏰ مؤجل: </strong>الحالة الافتراضية للطلبات المبدئية والانتظار.</div>
+          <div><strong className="text-purple-700">⭐ مرشح: </strong>أولياء حريصون حضروا وتابعوا التسجيل.</div>
+          <div><strong className="text-emerald-700">✅ انضم: </strong>تم قبوله رسمياً وإلحاقه بفوج للدارسة.</div>
+          <div><strong className="text-blue-700">📞 تم الاتصال: </strong>تم التواصل معه، قد ينضم وقد يعتذر.</div>
+          <div><strong className="text-gray-600">🏫 مدرسة أخرى: </strong>اتصلنا به ووجدناه قد انضم لمكان آخر.</div>
+          <div><strong className="text-yellow-600">⚠️ مكرر: </strong>الطلب مسجل أكثر من مرة في النظام.</div>
+          <div><strong className="text-red-600">❌ مرفوض: </strong>تم رفض طلب التسجيل لسبب ما.</div>
+          <div><strong className="text-gray-500">📵 لم يرد: </strong>حاولنا الاتصال بالولي ولم يتم الرد.</div>
+        </div>
+      </div>
+
       {/* ── فلاتر ── */}
       <div className="space-y-3">
         <StatusFilterBar value={filterStatus} onChange={setFilterStatus} counts={counts} />
@@ -1522,10 +1556,10 @@ function RegistrationsPage() {
         <PipelineView items={filtered} onStatusModal={setStatusModal} onEditModal={setEditModal} updating={updating} />
       ) : viewMode === "cards" ? (
         <CardsView items={paginated} updating={updating} onStatusModal={setStatusModal}
-          onEditModal={setEditModal} selectedIds={selectedIds} onSelectId={handleSelectId} />
+          onEditModal={setEditModal} onViewModal={setViewModal} selectedIds={selectedIds} onSelectId={handleSelectId} />
       ) : (
         <TableView items={paginated} updating={updating} onStatusModal={setStatusModal}
-          onEditModal={setEditModal} selectedIds={selectedIds} onSelectId={handleSelectId} onSelectAll={handleSelectAll} />
+          onEditModal={setEditModal} onViewModal={setViewModal} selectedIds={selectedIds} onSelectId={handleSelectId} onSelectAll={handleSelectAll} />
       )}
 
       {/* ── Pagination ── */}
@@ -1569,6 +1603,9 @@ function RegistrationsPage() {
       {bulkModal && (
         <BulkStatusModal count={selectedIds.length} onSave={handleBulkStatusChange} onClose={() => setBulkModal(false)} />
       )}
+      {viewModal && (
+        <ViewRegModal reg={viewModal} onClose={() => setViewModal(null)} />
+      )}
     </div>
   );
 }
@@ -1579,5 +1616,62 @@ export default function RegistrationsPagePage() {
     <SchoolGuard>
       <RegistrationsPage />
     </SchoolGuard>
+  );
+}
+// ──────────────────────────────────────────────────────────
+// Modal عرض بيانات المرشح (بطاقة معلومات)
+// ──────────────────────────────────────────────────────────
+function ViewRegModal({ reg, onClose }: { reg: PreRegistration; onClose: () => void }) {
+  const cfg = STATUS_CFG[reg.status];
+  return (
+    <Modal isOpen onClose={onClose} title="بطاقة المرشح">
+      <div className="p-6 space-y-6">
+        <div className="flex items-center gap-4">
+          <div className={`w-16 h-16 rounded-2xl overflow-hidden shadow-sm ${!reg.photoURL ? (reg.gender === "أنثى" ? "bg-gradient-to-br from-pink-400 to-rose-500" : "bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)]") : ""}`}>
+            {reg.photoURL ? <img src={reg.photoURL} alt="" className="w-full h-full object-cover" />
+              : <div className="w-full h-full flex items-center justify-center text-white font-black text-2xl">{reg.fullName[0]}</div>}
+          </div>
+          <div>
+            <h3 className="text-xl font-black text-gray-900">{reg.fullName} <span className="text-sm font-medium text-gray-400">({reg.gender})</span></h3>
+            <div className="flex items-center gap-2 mt-1">
+              <span className={`text-xs font-black px-2 py-0.5 rounded-lg border ${cfg.bg} ${cfg.color} ${cfg.border}`}>{cfg.emoji} {cfg.label}</span>
+              {reg.educationalLevel && <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">{reg.educationalLevel}</span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+            <span className="text-[10px] font-bold text-gray-400 block mb-1">رقم الهاتف 1</span>
+            <a href={`tel:${reg.phone1}`} className="text-sm font-black text-gray-800 hover:text-[var(--color-primary)]" dir="ltr">{reg.phone1}</a>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+            <span className="text-[10px] font-bold text-gray-400 block mb-1">رقم الهاتف 2</span>
+            <p className="text-sm font-black text-gray-800" dir="ltr">{reg.phone2 || "—"}</p>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+            <span className="text-[10px] font-bold text-gray-400 block mb-1">ولي الأمر</span>
+            <p className="text-sm font-black text-gray-800">{reg.guardianName || "—"}</p>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+            <span className="text-[10px] font-bold text-gray-400 block mb-1">تاريخ الميلاد</span>
+            <p className="text-sm font-black text-gray-800" dir="ltr">{reg.birthDate || "—"}</p>
+          </div>
+        </div>
+
+        {reg.notes && (
+          <div className="bg-amber-50/50 rounded-xl p-3 border border-amber-100">
+            <span className="text-[10px] font-bold text-amber-600 block mb-1">ملاحظات والتفاصيل الإضافية</span>
+            <p className="text-sm font-medium text-amber-900 leading-relaxed whitespace-pre-wrap">{reg.notes}</p>
+          </div>
+        )}
+
+        <div className="flex justify-end pt-4 border-t border-gray-100">
+          <button onClick={onClose} className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors">
+            إغلاق البطاقة
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }

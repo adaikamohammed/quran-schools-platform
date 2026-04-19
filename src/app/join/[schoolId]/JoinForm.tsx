@@ -141,8 +141,8 @@ export default function JoinForm({ schoolId, schoolName, location }: JoinFormPro
             شكرًا لك. تم تحويل بيانات الطالب <strong className="text-emerald-700">{form.fullName}</strong> إلى إدارة{" "}
             <strong>{schoolName}</strong> بنجاح.
           </p>
-          <p className="text-gray-400 text-sm font-medium">
-            سيتم التواصل معك عبر الرقم <strong dir="ltr">{form.phone1}</strong> لاستكمال إجراءات القبول.
+          <p className="text-gray-500 text-sm font-medium border-t border-gray-100 pt-4 mt-2">
+            تم إدراج الطالب في قائمة الانتظار، ونلفت انتباهكم أن <strong className="text-gray-800">القبول النهائي ودخول الطالب يعتمد على أولوية التسجيل وحرص الولي</strong> على المتابعة.
           </p>
         </motion.div>
       </div>
@@ -211,6 +211,24 @@ export default function JoinForm({ schoolId, schoolName, location }: JoinFormPro
                   <input
                     type="date" value={form.birthDate}
                     onChange={e => update("birthDate", e.target.value)}
+                    className={`${inputCls} pr-11`}
+                  />
+                </div>
+              </Field>
+
+              <Field label="أو أدخل عُمر الطالب (وسنحسب السنة)">
+                <div className="relative">
+                  <User size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="number"
+                    placeholder="مثال: 10" min="4" max="80"
+                    onChange={e => {
+                      const age = parseInt(e.target.value);
+                      if (age > 0) {
+                        const year = new Date().getFullYear() - age;
+                        update("birthDate", `${year}-01-01`);
+                      }
+                    }}
                     className={`${inputCls} pr-11`}
                   />
                 </div>

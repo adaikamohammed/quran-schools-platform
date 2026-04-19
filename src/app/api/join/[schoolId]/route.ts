@@ -47,7 +47,7 @@ export async function POST(
         guardian_name: body.guardianName || null,
         phone1: body.phone1,
         phone2: body.phone2 || null,
-        status: 'مرشح',
+        status: 'مؤجل',
         notes: finalNotes || null,
         requested_at: now,
         created_at: now,
