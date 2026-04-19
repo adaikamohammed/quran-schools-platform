@@ -167,7 +167,7 @@ export default function Modal({
               )}
 
               {/* ── Body — scrolls internally ── */}
-              <div className="flex-1 overflow-y-auto overscroll-contain">
+              <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-5">
                 {children}
               </div>
 
