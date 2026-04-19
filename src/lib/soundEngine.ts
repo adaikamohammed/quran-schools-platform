@@ -45,6 +45,12 @@ function tone(
 
   osc.start(ctx.currentTime);
   osc.stop(ctx.currentTime + duration + 0.01);
+
+  // تنظيف الذاكرة (Garbage Collection) فور انتهاء الصوت
+  osc.onended = () => {
+    osc.disconnect();
+    gain.disconnect();
+  };
 }
 
 // ── مكتبة الأصوات ─────────────────────────────────────────────
