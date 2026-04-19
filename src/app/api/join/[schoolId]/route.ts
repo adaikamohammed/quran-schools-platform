@@ -23,6 +23,19 @@ export async function POST(
 
     const now = new Date().toISOString();
 
+    // 💡 دمج البيانات الإضافية التي لا تحتوي على أعمدة في قاعدة البيانات داخل الـ Notes
+    const extraDetails = [];
+    if (body.address) extraDetails.push(`العنوان: ${body.address}`);
+    if (body.memorizationLevel) extraDetails.push(`الحفظ الحالي: ${body.memorizationLevel}`);
+    if (body.subscriptionTier) extraDetails.push(`فئة الاشتراك: ${body.subscriptionTier}`);
+
+    let finalNotes = body.notes || '';
+    if (extraDetails.length > 0) {
+      finalNotes = finalNotes 
+        ? `${finalNotes}\n---\n${extraDetails.join('\n')}` 
+        : extraDetails.join('\n');
+    }
+
     const { data, error } = await supabaseAdmin
       .from('pre_registrations')
       .insert({
@@ -34,11 +47,8 @@ export async function POST(
         guardian_name: body.guardianName || null,
         phone1: body.phone1,
         phone2: body.phone2 || null,
-        address: body.address || null,
         status: 'مرشح',
-        notes: body.notes || null,
-        memorization_level: body.memorizationLevel || null,
-        subscription_tier: body.subscriptionTier || null,
+        notes: finalNotes || null,
         requested_at: now,
         created_at: now,
         updated_at: now,
