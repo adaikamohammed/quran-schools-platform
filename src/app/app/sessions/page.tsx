@@ -1467,7 +1467,7 @@ function SessionsPage() {
                   </div>
 
                   {/* الطلاب */}
-                  <div className="divide-y divide-gray-100 pb-20">
+                  <div className="divide-y divide-gray-100 pb-40 lg:pb-20">
                     {students.map((student) => {
                       const rec = records.find((r: DailyRecord) => r.studentId === student.id) ?? {
                         studentId: student.id,
@@ -1564,7 +1564,7 @@ function SessionsPage() {
           )}
 
           {/* ─── أزرار الحفظ والإجراءات (Sticky Footer) ─── */}
-          <div className="fixed bottom-0 left-0 right-0 sm:static sm:bottom-auto sm:left-auto sm:right-auto bg-white/90 sm:bg-transparent border-t border-gray-200 sm:border-0 p-4 sm:p-0 z-40 backdrop-blur-md shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)] sm:shadow-none">
+          <div className="fixed bottom-[calc(56px+env(safe-area-inset-bottom,0px))] lg:static lg:bottom-auto left-0 right-0 lg:left-auto lg:right-auto bg-white/90 lg:bg-transparent border-t border-gray-200 lg:border-0 p-4 lg:p-0 z-40 backdrop-blur-md shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)] lg:shadow-none">
             <div className="max-w-4xl mx-auto flex gap-3 flex-col-reverse sm:flex-row flex-wrap">
               {/* WhatsApp */}
               {stats.filled > 0 && (

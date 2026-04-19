@@ -392,6 +392,49 @@ export default function AppSidebar({
             const hasActive = group.items.some((i) => isActive(i.href));
             const FirstIcon = group.items[0]?.icon;
 
+            // ── ألوان مميزة لكل مجموعة ────────────────────────
+            const GROUP_COLORS: Record<string, {
+              activeBg: string; activeText: string; activeShadow: string;
+              idleBg: string; idleText: string; idleIcon: string;
+            }> = {
+              "الميدان التربوي": {
+                activeBg: "bg-[var(--color-primary)]", activeText: "text-white", activeShadow: "shadow-md shadow-[var(--color-primary)]/20",
+                idleBg: "bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/15", idleText: "text-emerald-800 dark:text-emerald-300", idleIcon: "text-emerald-600 dark:text-emerald-400",
+              },
+              "بوصلة المتابعة": {
+                activeBg: "bg-blue-600", activeText: "text-white", activeShadow: "shadow-md shadow-blue-500/20",
+                idleBg: "bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/15", idleText: "text-blue-800 dark:text-blue-300", idleIcon: "text-blue-600 dark:text-blue-400",
+              },
+              "سباق التميز": {
+                activeBg: "bg-amber-500", activeText: "text-white", activeShadow: "shadow-md shadow-amber-400/20",
+                idleBg: "bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/15", idleText: "text-amber-800 dark:text-amber-300", idleIcon: "text-amber-600 dark:text-amber-400",
+              },
+              "الإدارة": {
+                activeBg: "bg-purple-600", activeText: "text-white", activeShadow: "shadow-md shadow-purple-500/20",
+                idleBg: "bg-purple-50 dark:bg-purple-500/10 hover:bg-purple-100 dark:hover:bg-purple-500/15", idleText: "text-purple-800 dark:text-purple-300", idleIcon: "text-purple-600 dark:text-purple-400",
+              },
+              "الإعدادات": {
+                activeBg: "bg-gray-700 dark:bg-gray-600", activeText: "text-white", activeShadow: "shadow-md shadow-gray-500/20",
+                idleBg: "bg-gray-100 dark:bg-white/8 hover:bg-gray-200 dark:hover:bg-white/12", idleText: "text-gray-700 dark:text-gray-300", idleIcon: "text-gray-500 dark:text-gray-400",
+              },
+              "مركز التحكم": {
+                activeBg: "bg-[var(--color-primary)]", activeText: "text-white", activeShadow: "shadow-md shadow-[var(--color-primary)]/20",
+                idleBg: "bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/15", idleText: "text-emerald-800 dark:text-emerald-300", idleIcon: "text-emerald-600 dark:text-emerald-400",
+              },
+              "إدارة المدارس": {
+                activeBg: "bg-indigo-600", activeText: "text-white", activeShadow: "shadow-md shadow-indigo-500/20",
+                idleBg: "bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/15", idleText: "text-indigo-800 dark:text-indigo-300", idleIcon: "text-indigo-600 dark:text-indigo-400",
+              },
+              "حسابي": {
+                activeBg: "bg-gray-700 dark:bg-gray-600", activeText: "text-white", activeShadow: "shadow-md shadow-gray-500/20",
+                idleBg: "bg-gray-100 dark:bg-white/8 hover:bg-gray-200 dark:hover:bg-white/12", idleText: "text-gray-700 dark:text-gray-300", idleIcon: "text-gray-500 dark:text-gray-400",
+              },
+            };
+            const gc = GROUP_COLORS[group.title] ?? {
+              activeBg: "bg-[var(--color-primary)]", activeText: "text-white", activeShadow: "shadow-md shadow-[var(--color-primary)]/20",
+              idleBg: "bg-gray-100 dark:bg-white/8 hover:bg-gray-200 dark:hover:bg-white/12", idleText: "text-gray-700 dark:text-gray-300", idleIcon: "text-gray-500 dark:text-gray-400",
+            };
+
             /* ── COLLAPSED MODE ── */
             if (isCollapsed) {
               return (
@@ -404,12 +447,12 @@ export default function AppSidebar({
                   <button
                     className={`w-full h-11 rounded-xl flex items-center justify-center transition-all duration-200
                       ${hasActive
-                        ? "bg-[var(--color-primary)] text-white shadow-md shadow-[var(--color-primary)]/20"
-                        : "text-gray-500 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-white/8 hover:text-gray-900 dark:hover:text-white"
+                        ? `${gc.activeBg} ${gc.activeText} ${gc.activeShadow}`
+                        : `${gc.idleBg} ${gc.idleText}`
                       }`}
                     title={group.title}
                   >
-                    {FirstIcon && <FirstIcon className="w-5 h-5" />}
+                    {FirstIcon && <FirstIcon className={`w-5 h-5 ${hasActive ? gc.activeText : gc.idleIcon}`} />}
                   </button>
 
                   <AnimatePresence>
@@ -444,13 +487,13 @@ export default function AppSidebar({
                   className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold transition-all duration-200
                     ${isOpen ? "cursor-pointer select-none" : "cursor-default"}
                     ${hasActive
-                      ? "bg-[var(--color-primary)] text-white shadow-md shadow-[var(--color-primary)]/20"
-                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/8 hover:text-gray-900 dark:hover:text-white"
+                      ? `${gc.activeBg} ${gc.activeText} ${gc.activeShadow}`
+                      : `${gc.idleBg} ${gc.idleText}`
                     }`}
                 >
                   {FirstIcon && (
                     <FirstIcon
-                      className={`w-4 h-4 shrink-0 ${hasActive ? "text-white" : "text-gray-500"}`}
+                      className={`w-4 h-4 shrink-0 ${hasActive ? gc.activeText : gc.idleIcon}`}
                     />
                   )}
                   <span className="flex-1 sidebar-label">{group.title}</span>
@@ -460,7 +503,7 @@ export default function AppSidebar({
                     <ChevronRight
                       className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200
                         ${openGroups[group.title] ? "rotate-90" : ""}
-                        ${hasActive ? "text-white/70" : "text-gray-400"}`}
+                        ${hasActive ? "opacity-80" : "opacity-50"}`}
                     />
                   )}
                 </div>

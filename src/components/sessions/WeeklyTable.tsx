@@ -205,9 +205,9 @@ export function WeeklyTable({
           <thead>
             <tr className="bg-gray-50/50">
               {/* عمود الاسم — واسع */}
-              <th className="sticky right-0 z-20 bg-gray-50 border-b border-l border-gray-100 text-right p-3 w-[200px] min-w-[200px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
-                <span className="text-xs font-black text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                  <Activity className="h-3 w-3" /> الطالب
+              <th className="sticky right-0 z-20 bg-gray-50 border-b border-l border-gray-100 text-right p-2 sm:p-3 w-[120px] min-w-[120px] sm:w-[200px] sm:min-w-[200px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                <span className="text-[11px] sm:text-xs font-black text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                  <Activity className="h-3 w-3 shrink-0" /> <span className="truncate">الطالب</span>
                 </span>
               </th>
 
@@ -256,8 +256,8 @@ export function WeeklyTable({
               return (
                 <tr key={student.id} className={cn("group transition-colors", rowBg)}>
                   {/* اسم الطالب */}
-                  <td className={cn("sticky right-0 z-10 border-l border-gray-100 text-right px-3 py-3 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] w-[200px] min-w-[200px]", stickyBg)}>
-                    <span className="text-[13px] font-bold text-gray-800 leading-snug"
+                  <td className={cn("sticky right-0 z-10 border-l border-gray-100 text-right p-2 sm:px-3 sm:py-3 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] w-[120px] min-w-[120px] sm:w-[200px] sm:min-w-[200px]", stickyBg)}>
+                    <span className="text-[11px] sm:text-[13px] font-bold text-gray-800 leading-snug"
                       style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                       {student.fullName}
                     </span>
@@ -337,7 +337,7 @@ export function WeeklyTable({
 
             {/* ─── صف الإحصائيات الكلية ──────────────────────── */}
             <tr className="bg-gray-50/80 border-t-2 border-gray-200">
-              <td className="sticky right-0 z-10 border-l border-gray-100 text-right p-3 bg-gray-50 font-black text-xs text-gray-700 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] w-[200px]">
+              <td className="sticky right-0 z-10 border-l border-gray-100 text-right p-2 sm:p-3 bg-gray-50 font-black text-[10px] sm:text-xs text-gray-700 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] w-[120px] min-w-[120px] sm:w-[200px] sm:min-w-[200px]">
                 الإحصائيات الكلية
               </td>
               <td className="border-l border-gray-100 p-2 bg-emerald-50/10" />
