@@ -25,9 +25,14 @@ export default async function JoinSchoolPage({ params }: { params: { schoolId: s
             !
           </div>
           <h1 className="text-2xl font-black text-gray-900 mb-2">تعذر العثور على المدرسة</h1>
-          <p className="text-gray-500 font-medium">
+          <p className="text-gray-500 font-medium pb-2 border-b border-gray-100 mb-2">
             تأكد من الرابط أو تواصل مع إدارة المدرسة للحصول على رابط التسجيل الصحيح.
           </p>
+          <div className="text-xs text-gray-400 mt-2 text-left" dir="ltr">
+            {error ? `DB Error: ${error.message}` : "Error: School data is null"}
+            <br />
+            ID: {schoolId}
+          </div>
         </div>
       </div>
     );
