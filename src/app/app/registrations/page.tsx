@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useSound } from "@/context/SoundContext";
 import { getDB, saveRegistration, queueForSync } from "@/lib/storage/db";
 import { createRegistration, updateRegistrationStatus, createStudent } from "@/lib/storage/mutations";
+import { syncNow } from "@/lib/storage/syncEngine";
 import type { PreRegistration, PreRegistrationStatus, AppUser, SubscriptionTier, MemorizationAmount, Student } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import Modal from "@/components/ui/Modal";
@@ -1364,24 +1365,16 @@ function RegistrationsPage() {
         }],
       });
 
-      // حفظ بيانات الفوج في الملاحظات ليقرأها المدير لاحقاً
-      let newNotes = reg.notes || "";
-      const syncMsg = `\n[تنبيه النظام: أُلحِق بفضيلة الشيخ ${enrollData.teacherName} (${enrollData.groupName})]`;
-      if (!newNotes.includes(`أُلحِق بفضيلة الشيخ ${enrollData.teacherName}`)) {
-        newNotes += syncMsg;
-      }
-      await updateRegistrationData(id, { status, notes: newNotes.trim() });
+      // مزامنة فورية لظهور الطالب في صفحة الطلاب مباشرةً
+      await syncNow();
+
+      // تحديث حالة التسجيل فقط (بلا كتابة في الملاحظات)
+      await updateRegistrationData(id, { status });
     } else {
       await updateRegistrationStatus(id, status, user?.id);
     }
 
-    setRegistrations((prev) => prev.map((r) => r.id === id ? { 
-      ...r, 
-      status, 
-      notes: (status === "تم الإنضمام" && enrollData) 
-        ? ((r.notes || "") + `\n[تنبيه النظام: أُلحِق بفضيلة الشيخ ${enrollData.teacherName} (${enrollData.groupName})]`).trim() 
-        : r.notes 
-    } : r));
+    setRegistrations((prev) => prev.map((r) => r.id === id ? { ...r, status } : r));
     setUpdating(null);
 
     // التشغيل الصوتي
@@ -1633,56 +1626,140 @@ export default function RegistrationsPagePage() {
   );
 }
 // ──────────────────────────────────────────────────────────
-// Modal عرض بيانات المرشح (بطاقة معلومات)
+// بطاقة مرشح احترافية
 // ──────────────────────────────────────────────────────────
 function ViewRegModal({ reg, onClose }: { reg: PreRegistration; onClose: () => void }) {
   const cfg = STATUS_CFG[reg.status];
+  const isGirl = reg.gender === "أنثى";
+  const avatarGradient = isGirl
+    ? "from-pink-400 to-rose-500"
+    : "from-emerald-500 to-teal-600";
+
+  const age = reg.birthDate
+    ? Math.floor((Date.now() - new Date(reg.birthDate).getTime()) / (365.25 * 24 * 3600 * 1000))
+    : null;
+
+  const regDate = new Date(reg.requestedAt).toLocaleDateString("ar-DZ", {
+    year: "numeric", month: "long", day: "numeric"
+  });
+
   return (
-    <Modal isOpen onClose={onClose} title="بطاقة المرشح">
-      <div className="p-6 space-y-6">
-        <div className="flex items-center gap-4">
-          <div className={`w-16 h-16 rounded-2xl overflow-hidden shadow-sm ${!reg.photoURL ? (reg.gender === "أنثى" ? "bg-gradient-to-br from-pink-400 to-rose-500" : "bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)]") : ""}`}>
-            {reg.photoURL ? <img src={reg.photoURL} alt="" className="w-full h-full object-cover" />
-              : <div className="w-full h-full flex items-center justify-center text-white font-black text-2xl">{reg.fullName[0]}</div>}
-          </div>
-          <div>
-            <h3 className="text-xl font-black text-gray-900">{reg.fullName} <span className="text-sm font-medium text-gray-400">({reg.gender})</span></h3>
-            <div className="flex items-center gap-2 mt-1">
-              <span className={`text-xs font-black px-2 py-0.5 rounded-lg border ${cfg.bg} ${cfg.color} ${cfg.border}`}>{cfg.emoji} {cfg.label}</span>
-              {reg.educationalLevel && <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">{reg.educationalLevel}</span>}
+    <Modal open={true} onClose={onClose} title="" size="md" preventClose={false}>
+      <div dir="rtl">
+        {/* — Header متدرج مع الأفاتار — */}
+        <div className={`relative bg-gradient-to-br ${avatarGradient} px-6 pt-8 pb-16 text-white rounded-t-2xl`}>
+          {/* زوج الدوائر التزيينية */}
+          <div className="absolute top-3 left-4 w-20 h-20 rounded-full bg-white/10" />
+          <div className="absolute bottom-4 right-2 w-12 h-12 rounded-full bg-white/10" />
+
+          <div className="flex items-center gap-4">
+            {/* أفاتار */}
+            <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-xl ring-4 ring-white/30 shrink-0">
+              {reg.photoURL
+                ? <img src={reg.photoURL} alt="" className="w-full h-full object-cover" />
+                : <div className={`w-full h-full flex items-center justify-center text-3xl font-black bg-white/20`}>
+                    {reg.fullName[0]}
+                  </div>}
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <h2 className="text-2xl font-black leading-tight truncate">{reg.fullName}</h2>
+              <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                <span className="text-sm text-white/80 font-medium">{reg.gender}</span>
+                {age && <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-bold">{age} سنة</span>}
+                {reg.educationalLevel && (
+                  <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-bold">{reg.educationalLevel}</span>
+                )}
+              </div>
+              <div className="mt-2">
+                <span className={`text-xs font-black px-2.5 py-1 rounded-xl bg-white/25 text-white inline-flex items-center gap-1`}>
+                  {cfg.emoji} {cfg.label}
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-            <span className="text-[10px] font-bold text-gray-400 block mb-1">رقم الهاتف 1</span>
-            <a href={`tel:${reg.phone1}`} className="text-sm font-black text-gray-800 hover:text-[var(--color-primary)]" dir="ltr">{reg.phone1}</a>
+        {/* — Body متداخل مع الهيدر — */}
+        <div className="-mt-10 mx-4 bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+
+          {/* أزرار سريعة */}
+          <div className="grid grid-cols-3 divide-x divide-x-reverse divide-gray-100 border-b border-gray-100">
+            <a href={`tel:${reg.phone1}`}
+              className="flex flex-col items-center gap-1 py-3 hover:bg-gray-50 transition-colors text-center">
+              <span className="text-lg">📞</span>
+              <span className="text-[10px] font-bold text-gray-500">اتصال</span>
+            </a>
+            <a href={`https://wa.me/${reg.phone1.replace(/\s/g, "").replace(/^0/, "213")}`}
+              target="_blank" rel="noreferrer"
+              className="flex flex-col items-center gap-1 py-3 hover:bg-green-50 transition-colors text-center">
+              <span className="text-lg">💬</span>
+              <span className="text-[10px] font-bold text-gray-500">واتساب</span>
+            </a>
+            <button onClick={onClose}
+              className="flex flex-col items-center gap-1 py-3 hover:bg-gray-50 transition-colors text-center">
+              <span className="text-lg">✏️</span>
+              <span className="text-[10px] font-bold text-gray-500">تعديل</span>
+            </button>
           </div>
-          <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-            <span className="text-[10px] font-bold text-gray-400 block mb-1">رقم الهاتف 2</span>
-            <p className="text-sm font-black text-gray-800" dir="ltr">{reg.phone2 || "—"}</p>
+
+          {/* بيانات الاتصال */}
+          <div className="p-4 space-y-3">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">بيانات الاتصال</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-[10px] text-gray-400 mb-0.5">هاتف 1</p>
+                <a href={`tel:${reg.phone1}`} className="text-sm font-black text-gray-800 hover:text-emerald-600 transition-colors" dir="ltr">
+                  {reg.phone1}
+                </a>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-[10px] text-gray-400 mb-0.5">هاتف 2</p>
+                {reg.phone2
+                  ? <a href={`tel:${reg.phone2}`} className="text-sm font-black text-gray-800" dir="ltr">{reg.phone2}</a>
+                  : <p className="text-sm text-gray-300">—</p>}
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-[10px] text-gray-400 mb-0.5">ولي الأمر</p>
+                <p className="text-sm font-black text-gray-800">{reg.guardianName || "—"}</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-[10px] text-gray-400 mb-0.5">تاريخ الميلاد</p>
+                <p className="text-sm font-black text-gray-800" dir="ltr">
+                  {reg.birthDate || "—"}
+                  {age ? <span className="text-xs text-gray-400 mr-1">({age}س)</span> : null}
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-            <span className="text-[10px] font-bold text-gray-400 block mb-1">ولي الأمر</span>
-            <p className="text-sm font-black text-gray-800">{reg.guardianName || "—"}</p>
+
+          {/* تاريخ التسجيل */}
+          <div className="px-4 pb-3">
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-xl px-3 py-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                <span className="text-[11px] font-bold text-gray-500">تاريخ التسجيل</span>
+              </div>
+              <span className="text-[11px] font-black text-gray-700">{regDate}</span>
+            </div>
           </div>
-          <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-            <span className="text-[10px] font-bold text-gray-400 block mb-1">تاريخ الميلاد</span>
-            <p className="text-sm font-black text-gray-800" dir="ltr">{reg.birthDate || "—"}</p>
-          </div>
+
+          {/* ملاحظات الولي */}
+          {reg.notes && (
+            <div className="px-4 pb-4">
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                <p className="text-[10px] font-black text-amber-600 mb-1.5">📝 ملاحظات / سبب الترشيح</p>
+                <p className="text-xs text-amber-900 leading-relaxed">{reg.notes}</p>
+              </div>
+            </div>
+          )}
         </div>
 
-        {reg.notes && (
-          <div className="bg-amber-50/50 rounded-xl p-3 border border-amber-100">
-            <span className="text-[10px] font-bold text-amber-600 block mb-1">ملاحظات والتفاصيل الإضافية</span>
-            <p className="text-sm font-medium text-amber-900 leading-relaxed whitespace-pre-wrap">{reg.notes}</p>
-          </div>
-        )}
-
-        <div className="flex justify-end pt-4 border-t border-gray-100">
-          <button onClick={onClose} className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors">
-            إغلاق البطاقة
+        {/* — Footer — */}
+        <div className="p-4">
+          <button onClick={onClose}
+            className="w-full py-2.5 rounded-xl text-sm font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors">
+            إغلاق
           </button>
         </div>
       </div>
