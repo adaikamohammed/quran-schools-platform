@@ -13,6 +13,7 @@
 import React, { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
+import { useSound } from "@/context/SoundContext";
 
 // ── الأحجام المتاحة ──────────────────────────────────────────
 const SIZE_CLASSES = {
@@ -65,6 +66,13 @@ export default function Modal({
   headerClassName = "",
 }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const { play } = useSound();
+
+  // صوت عند فتح النافذة
+  useEffect(() => {
+    if (open) play("pop");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Escape key to close
   useEffect(() => {

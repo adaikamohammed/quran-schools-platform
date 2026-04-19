@@ -27,16 +27,30 @@
   "shortcuts": [
     {
       "name": "الحصص اليومية",
-      "short_name": "الحصص",
-      "description": "تسجيل الحصة اليومية",
+      "short_name": "تحضير",
+      "description": "تسجيل الحصة والغيابات",
       "url": "/app/sessions",
       "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     },
     {
-      "name": "إدارة الطلاب",
-      "short_name": "الطلاب",
-      "description": "ملفات الطلاب",
-      "url": "/app/students",
+      "name": "المرشحون الجدد",
+      "short_name": "تسجيل",
+      "description": "تسجيل طالب أو مرشح جديد",
+      "url": "/app/registrations",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "التقارير والإحصاءات",
+      "short_name": "إحصاءات",
+      "description": "الاطلاع على تقنية الإحصائيات",
+      "url": "/app/reports",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "نظام النقاط",
+      "short_name": "النقاط",
+      "description": "ترتيب وتقييم الطلاب",
+      "url": "/app/ranking",
       "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     }
   ],

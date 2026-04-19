@@ -3,6 +3,7 @@ import SchoolGuard from "@/components/layout/SchoolGuard";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useSound } from "@/context/SoundContext";
 import { getDB, getSessionsByDateRange } from "@/lib/storage/db";
 import { createOrUpdateSession } from "@/lib/storage/mutations";
 import { surahs } from "@/lib/surahs";
@@ -734,6 +735,7 @@ function SessionSetup({
 
 function SessionsPage() {
   const { user, school, isPrincipal } = useAuth();
+  const { play } = useSound();
   const [teachers, setTeachers] = useState<AppUser[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>("");
 
@@ -934,6 +936,10 @@ function SessionsPage() {
       const old = prev.find((r) => r.studentId === studentId);
       
       if (patch.attendance && patch.attendance !== old?.attendance) {
+        // 🔊 tick عند تحضير طالب
+        if (["حاضر", "متأخر", "تعويض"].includes(patch.attendance)) {
+          play("tick");
+        }
         if (["حاضر", "متأخر", "تعويض"].includes(patch.attendance) && (!old?.attendance || old?.attendance === "غائب")) {
           setTimeout(async () => {
             const db = getDB();
@@ -1019,6 +1025,7 @@ function SessionsPage() {
       });
 
       setSaved(true);
+      play("success"); // 🔊 صوت النجاح عند الحفظ
 
       // تحديث الجلسة المحلية
       const db = getDB();
@@ -1070,6 +1077,7 @@ function SessionsPage() {
     const updatedList = await getSessionsByDateRange(selectedTeacherId, startStr, endStr);
     setSessionsList(updatedList);
     setSaving(false);
+    play("complete"); // 🔊 صوت الاكتمال بعد تحضير الجميع
   };
 
   // ─── تقرير WhatsApp ───────────────────────────────────────

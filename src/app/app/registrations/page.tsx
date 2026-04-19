@@ -3,6 +3,7 @@ import SchoolGuard from "@/components/layout/SchoolGuard";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useSound } from "@/context/SoundContext";
 import { getDB, saveRegistration, queueForSync } from "@/lib/storage/db";
 import { createRegistration, updateRegistrationStatus, createStudent } from "@/lib/storage/mutations";
 import type { PreRegistration, PreRegistrationStatus, AppUser, SubscriptionTier, MemorizationAmount, Student } from "@/lib/types";
@@ -1285,6 +1286,7 @@ function openPrintWindow(registrations: PreRegistration[], filterLabel: string, 
 // ──────────────────────────────────────────────────────────
 function RegistrationsPage() {
   const { user, school } = useAuth();
+  const { play } = useSound();
   const [registrations, setRegistrations] = useState<PreRegistration[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewModal, setShowNewModal] = useState(false);
@@ -1350,6 +1352,13 @@ function RegistrationsPage() {
 
     setRegistrations((prev) => prev.map((r) => r.id === id ? { ...r, status } : r));
     setUpdating(null);
+
+    // التشغيل الصوتي
+    if (status === "تم الإنضمام") {
+      play("achievement"); // 🎉 احتفال الماكينة
+    } else {
+      play("success"); // ✅ نجاح روتيني
+    }
   };
 
   const handleRegistrationUpdate = (updated: PreRegistration) => {
@@ -1438,6 +1447,7 @@ function RegistrationsPage() {
               onClick={() => {
                 const url = `${window.location.origin}/join/${school.id}`;
                 navigator.clipboard.writeText(url);
+                play("copy"); // 🔊 صوت النسخ السريع
                 alert("تم نسخ رابط التسجيل المخصص لمدرستك! انشره الآن لأولياء الأمور.");
               }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 transition-all"

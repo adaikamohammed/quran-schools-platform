@@ -9,6 +9,7 @@ import dynamic from "next/dynamic";
 const OnboardingTour = dynamic(() => import("@/components/layout/OnboardingTour").then(mod => mod.OnboardingTour), { ssr: false });
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import OfflineBanner from "@/components/layout/OfflineBanner";
+import { SoundProvider } from "@/context/SoundContext";
 import { Loader2 } from "lucide-react";
 
 // ─── مفتاح localStorage للحالة المصغّرة ────────────────────
@@ -79,38 +80,39 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // غير مسجّل → لا تعرض شيئاً (جارٍ التوجيه)
   if (!user) return null;
 
-  return (
-    <div
-      className="flex h-screen bg-[var(--color-background)] overflow-hidden transition-colors duration-300"
-      dir="rtl"
-    >
-      {/* Sidebar */}
-      <AppSidebar
-        isOpen={sidebarOpen}
-        onClose={handleCloseSidebar}
-        isCollapsed={sidebarCollapsed}
-        onToggleCollapse={handleToggleCollapse}
-      />
+    <SoundProvider>
+      <div
+        className="flex h-screen bg-[var(--color-background)] overflow-hidden transition-colors duration-300"
+        dir="rtl"
+      >
+        {/* Sidebar */}
+        <AppSidebar
+          isOpen={sidebarOpen}
+          onClose={handleCloseSidebar}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={handleToggleCollapse}
+        />
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Header */}
-        <AppHeader onMenuToggle={() => setSidebarOpen((v) => !v)} />
+        {/* Main content */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Header */}
+          <AppHeader onMenuToggle={() => setSidebarOpen((v) => !v)} />
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 relative scrollbar-thin app-main-content">
-          {children}
-          <OnboardingTour />
-        </main>
+          {/* Page content */}
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 relative scrollbar-thin app-main-content">
+            {children}
+            <OnboardingTour />
+          </main>
+        </div>
+
+        {/* ⚠️  PushNotificationManager مُزال — التحكم في الإشعارات من صفحة الإعدادات فقط */}
+
+        {/* Offline Banner */}
+        <OfflineBanner />
+
+        {/* Mobile Bottom Navigation — يظهر على الهاتف فقط */}
+        <MobileBottomNav />
       </div>
-
-      {/* ⚠️  PushNotificationManager مُزال — التحكم في الإشعارات من صفحة الإعدادات فقط */}
-
-      {/* Offline Banner */}
-      <OfflineBanner />
-
-      {/* Mobile Bottom Navigation — يظهر على الهاتف فقط */}
-      <MobileBottomNav />
-    </div>
+    </SoundProvider>
   );
 }

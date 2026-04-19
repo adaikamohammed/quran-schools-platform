@@ -2,8 +2,9 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useSound } from "@/context/SoundContext";
 import SyncIndicator from "./SyncIndicator";
-import { Menu, Bell, Home, Moon, Sun } from "lucide-react";
+import { Menu, Bell, Home, Moon, Sun, Volume2, VolumeX } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
@@ -65,6 +66,7 @@ interface AppHeaderProps {
 export default function AppHeader({ onMenuToggle }: AppHeaderProps) {
   const { user } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+  const { enabled: soundEnabled, toggle: toggleSound } = useSound();
   const pathname = usePathname();
   const pageInfo = getPageInfo(pathname);
   const isHome = pathname === "/app";
@@ -128,6 +130,19 @@ export default function AppHeader({ onMenuToggle }: AppHeaderProps) {
             {isDark
               ? <Sun className="w-4.5 h-4.5 text-amber-400" />
               : <Moon className="w-4.5 h-4.5 text-indigo-500" />
+            }
+          </button>
+
+          {/* Sound toggle */}
+          <button
+            id="header-sound-toggle"
+            onClick={toggleSound}
+            title={soundEnabled ? "كتم الأصوات" : "تفعيل الأصوات"}
+            className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-white/8 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/15 hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            {soundEnabled
+              ? <Volume2 className="w-4 h-4 text-emerald-500" />
+              : <VolumeX className="w-4 h-4 text-gray-400" />
             }
           </button>
 
