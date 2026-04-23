@@ -7,8 +7,6 @@ import type { Student, DailySession, SurahProgress } from "@/lib/types";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
-import {
-  ArrowRight,
   Phone,
   Calendar,
   BookOpen,
@@ -172,6 +170,7 @@ export default function StudentProfilePage() {
                   {student.groupName} · {student.subscriptionTier}
                 </p>
               </div>
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
                     const link = `${window.location.origin}/student/${student.id}`;
