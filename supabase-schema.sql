@@ -297,42 +297,51 @@ ALTER TABLE public.daily_reports    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.meetings         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_notifications ENABLE ROW LEVEL SECURITY;
 
--- السياسات — يسمح للـ service_role بكل شيء (للـ API Routes)
-CREATE POLICY "Service role bypass" ON public.schools
-  FOR ALL USING (true) WITH CHECK (true);
+-- دوال مساعدة لسياسات الأمان
+CREATE OR REPLACE FUNCTION public.current_school_id() RETURNS UUID AS $$
+  SELECT school_id FROM public.users WHERE id = auth.uid();
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
 
-CREATE POLICY "Service role bypass" ON public.users
-  FOR ALL USING (true) WITH CHECK (true);
+CREATE OR REPLACE FUNCTION public.is_super_admin() RETURNS BOOLEAN AS $$
+  SELECT role = 'super_admin' FROM public.users WHERE id = auth.uid();
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
 
-CREATE POLICY "Service role bypass" ON public.students
-  FOR ALL USING (true) WITH CHECK (true);
+-- السياسات
+CREATE POLICY "Users access own school" ON public.schools
+  FOR ALL TO authenticated USING (id = public.current_school_id() OR public.is_super_admin());
 
-CREATE POLICY "Service role bypass" ON public.covenants
-  FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Users access own school data" ON public.users
+  FOR ALL TO authenticated USING (school_id = public.current_school_id() OR id = auth.uid() OR public.is_super_admin());
 
-CREATE POLICY "Service role bypass" ON public.daily_sessions
-  FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Users access own school data" ON public.students
+  FOR ALL TO authenticated USING (school_id = public.current_school_id() OR public.is_super_admin());
 
-CREATE POLICY "Service role bypass" ON public.daily_records
-  FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Users access own school data" ON public.covenants
+  FOR ALL TO authenticated USING (student_id IN (SELECT id FROM public.students WHERE school_id = public.current_school_id()) OR public.is_super_admin());
 
-CREATE POLICY "Service role bypass" ON public.surah_progresses
-  FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Users access own school data" ON public.daily_sessions
+  FOR ALL TO authenticated USING (school_id = public.current_school_id() OR public.is_super_admin());
 
-CREATE POLICY "Service role bypass" ON public.payments
-  FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Users access own school data" ON public.daily_records
+  FOR ALL TO authenticated USING (student_id IN (SELECT id FROM public.students WHERE school_id = public.current_school_id()) OR public.is_super_admin());
 
-CREATE POLICY "Service role bypass" ON public.pre_registrations
-  FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Users access own school data" ON public.surah_progresses
+  FOR ALL TO authenticated USING (school_id = public.current_school_id() OR public.is_super_admin());
 
-CREATE POLICY "Service role bypass" ON public.daily_reports
-  FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Users access own school data" ON public.payments
+  FOR ALL TO authenticated USING (school_id = public.current_school_id() OR public.is_super_admin());
 
-CREATE POLICY "Service role bypass" ON public.meetings
-  FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Users access own school data" ON public.pre_registrations
+  FOR ALL TO authenticated USING (school_id = public.current_school_id() OR public.is_super_admin());
 
-CREATE POLICY "Service role bypass" ON public.system_notifications
-  FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Users access own school data" ON public.daily_reports
+  FOR ALL TO authenticated USING (school_id = public.current_school_id() OR public.is_super_admin());
+
+CREATE POLICY "Users access own school data" ON public.meetings
+  FOR ALL TO authenticated USING (school_id = public.current_school_id() OR public.is_super_admin());
+
+CREATE POLICY "Users access own school data" ON public.system_notifications
+  FOR ALL TO authenticated USING (school_id = public.current_school_id() OR public.is_super_admin());
 
 CREATE POLICY "Allow Insert for Authenticated" ON public.system_notifications
   FOR INSERT TO authenticated WITH CHECK (true);
@@ -362,8 +371,11 @@ CREATE TABLE IF NOT EXISTS public.school_requests (
 
 ALTER TABLE public.school_requests ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Service role bypass" ON public.school_requests
-  FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public insert" ON public.school_requests
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Allow super admin read" ON public.school_requests
+  FOR SELECT USING (public.is_super_admin());
 
 -- ─── 16. إنشاء مدرسة وحساب المدير (RPC) ───────────────────────────────────
 -- ملاحظة: يتطلب إضافة إضافة pgcrypto

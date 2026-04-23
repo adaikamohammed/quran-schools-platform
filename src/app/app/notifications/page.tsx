@@ -11,6 +11,8 @@ import {
   UserPlus, CheckCircle2, RefreshCw, X, Filter, Megaphone
 } from "lucide-react";
 
+import { useRouter } from "next/navigation";
+
 // ─── أنواع التنبيهات ──────────────────────────────────────
 
 type AlertSeverity = "critical" | "warning" | "info";
@@ -46,6 +48,7 @@ const TYPE_ICON = {
 
 function NotificationsPage() {
   const { user, school, role } = useAuth();
+  const router = useRouter();
   const [alerts, setAlerts] = useState<AppAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | AlertSeverity>("all");
@@ -348,13 +351,23 @@ function NotificationsPage() {
               const typeIconCfg = TYPE_ICON[alert.type];
               const Icon = typeIconCfg.icon;
 
+              const isClickable = alert.type === "absent_student" && alert.entityId;
+
               return (
                 <motion.div
                   key={alert.id}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.04 }}
+                  onClick={() => {
+                    if (isClickable) {
+                      markRead(alert.id);
+                      router.push(`/app/student-history?studentId=${alert.entityId}`);
+                    }
+                  }}
                   className={`relative bg-white rounded-2xl border-2 p-4 flex items-start gap-4 transition-all hover:shadow-sm ${
+                    isClickable ? "cursor-pointer hover:border-[var(--color-primary)]/40" : ""
+                  } ${
                     alert.isRead
                       ? "border-gray-100 opacity-60"
                       : `${sev.border}`
@@ -387,16 +400,24 @@ function NotificationsPage() {
                       </div>
                     )}
                     <p className="text-xs text-gray-500 leading-relaxed">{alert.description}</p>
+                    <p className="text-[10px] text-gray-400 mt-1.5 font-bold">
+                      {new Date(alert.createdAt).toLocaleString('ar-DZ', {
+                        year: 'numeric', month: 'short', day: 'numeric',
+                        hour: 'numeric', minute: '2-digit'
+                      })}
+                    </p>
                   </div>
 
                   {/* إجراء */}
-                  {!alert.isRead && (
-                    <button onClick={() => markRead(alert.id)}
-                      className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors shrink-0"
-                      title="تحديد كمقروء">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                  <div className="flex flex-col items-center gap-2 shrink-0">
+                    {!alert.isRead && (
+                      <button onClick={(e) => { e.stopPropagation(); markRead(alert.id); }}
+                        className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+                        title="تحديد كمقروء">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </motion.div>
               );
             })}

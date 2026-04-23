@@ -14,9 +14,9 @@ import {
 } from "lucide-react";
 
 const stats = [
-  { value: "50+", label: "مدرسة منضمة", icon: Building2 },
-  { value: "5,000+", label: "طالب مسجّل", icon: Users },
-  { value: "12", label: "دولة عربية", icon: Globe },
+  { value: "300+", label: "طالب فعلي مسجّل", icon: Users },
+  { value: "18", label: "فوجاً قرآنياً", icon: BookOpen },
+  { value: "مجاني 100%", label: "وقف خيري دائم", icon: Globe },
 ];
 
 const highlights = [

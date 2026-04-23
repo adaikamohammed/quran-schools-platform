@@ -75,16 +75,17 @@ export default function LoginPage() {
           </p>
 
           {/* Decorative stats */}
-          <div className="grid grid-cols-2 gap-4 pt-4">
+          <div className="grid grid-cols-3 gap-3 pt-4">
             {[
-              { label: "مدرسة منضمة", value: "50+" },
-              { label: "طالب مسجّل", value: "5,000+" },
+              { label: "مدرسة مطبقة", value: "1" },
+              { label: "طالب فعلي", value: "+300" },
+              { label: "فوج قرآني", value: "18" },
             ].map((s, i) => (
-              <div key={i} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+              <div key={i} className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm text-center">
                 <p className="text-2xl font-black text-gray-900 mb-1" style={{ fontFamily: "var(--font-headline)" }}>
                   {s.value}
                 </p>
-                <p className="text-gray-500 text-sm">{s.label}</p>
+                <p className="text-gray-500 text-xs font-bold">{s.label}</p>
               </div>
             ))}
           </div>

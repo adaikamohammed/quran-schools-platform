@@ -122,12 +122,9 @@ function TeacherModal({
               <PasswordInput
                 value={form.password}
                 onChange={(v) => setForm({ ...form, password: v })}
-                placeholder={teacher ? (teacher.plain_password || "••••••••") : "••••••••"}
+                placeholder="••••••••"
               />
             </div>
-            {teacher?.plain_password && form.password === "" && (
-              <p className="text-xs text-emerald-600 mt-1 font-medium">كلمة المرور الحالية محفوظة: <span className="font-bold select-all" dir="ltr">{teacher.plain_password}</span></p>
-            )}
           </div>
 
           <div className="col-span-2 sm:col-span-1">
@@ -174,40 +171,6 @@ function PasswordInput({ value, onChange, placeholder }: { value: string; onChan
         className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
       >
         {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-      </button>
-    </div>
-  );
-}
-
-// ─── بادج كلمة مرور المعلم في الكارد ────────────────────────
-function TeacherPasswordBadge({ password }: { password: string }) {
-  const [show, setShow] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const copy = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(password);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-  return (
-    <div className="flex items-center gap-1.5 text-xs bg-amber-50 dark:bg-amber-500/10 rounded-lg px-2.5 py-1.5">
-      <KeyRound className="w-3 h-3 text-amber-500 shrink-0" />
-      <span className="text-amber-700 dark:text-amber-300 font-bold flex-1 select-all" dir="ltr">
-        {show ? password : "••••••••"}
-      </span>
-      <button
-        onClick={(e) => { e.stopPropagation(); setShow(s => !s); }}
-        className="text-amber-400 hover:text-amber-600 shrink-0"
-        title={show ? "إخفاء" : "إظهار كلمة المرور"}
-      >
-        {show ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-      </button>
-      <button
-        onClick={copy}
-        className="text-amber-400 hover:text-amber-600 shrink-0"
-        title="نسخ كلمة المرور"
-      >
-        {copied ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
       </button>
     </div>
   );
@@ -299,9 +262,7 @@ function TeachersPage() {
         photo_url: data.photoURL,
       };
 
-      // إذا أدخل المدير كلمة مرور جديدة — نحفظها في plain_password
       if (data.password) {
-        updatePayload.plain_password = data.password;
         // تحديث كلمة المرور في auth.users عبر API مخصص (اختياري)
         await fetch("/api/teachers/update-password", {
           method: "POST",
@@ -423,9 +384,7 @@ function TeachersPage() {
                       </button>
                     </div>
                     {/* كلمة المرور */}
-                    {t.plain_password && (
-                      <TeacherPasswordBadge password={t.plain_password} />
-                    )}
+
                     <div className="h-px bg-gray-100 my-1" />
                     <p className="flex justify-between items-center text-xs text-gray-500 font-medium"><span className="opacity-70">إجمالي الطلاب:</span>
                       <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-lg font-black flex items-center gap-1.5">

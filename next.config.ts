@@ -11,10 +11,7 @@ const nextConfig = {
   turbopack: {}, // Required in Next.js 16+ to acknowledge Turbopack alongside webpack configs
   typescript: {
     ignoreBuildErrors: true, // لا توقف البناء بسبب أخطاء TypeScript
-  },
-  eslint: {
-    ignoreDuringBuilds: true, // لا توقف البناء بسبب أخطاء ESLint
-  },
+  }
 } satisfies Record<string, unknown>;
 
 export default withSerwist(nextConfig);

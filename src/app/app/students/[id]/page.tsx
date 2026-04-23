@@ -7,6 +7,8 @@ import type { Student, DailySession, SurahProgress } from "@/lib/types";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
+import {
+  ArrowRight,
   Phone,
   Calendar,
   BookOpen,
@@ -21,6 +23,8 @@ import {
   Users2,
   Printer,
   TrendingUp,
+  Link as LinkIcon,
+  Save,
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -66,6 +70,10 @@ export default function StudentProfilePage() {
   const [surahProgress, setSurahProgress] = useState<SurahProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"info" | "sessions" | "quran" | "covenants" | "analytics">("info");
+  const [editingNote, setEditingNote] = useState(false);
+  const [tempNote, setTempNote] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+  const [analyticsView, setAnalyticsView] = useState<"velocity" | "radar" | "heatmap">("velocity");
 
   useEffect(() => {
     const load = async () => {
@@ -164,7 +172,18 @@ export default function StudentProfilePage() {
                   {student.groupName} · {student.subscriptionTier}
                 </p>
               </div>
-              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const link = `${window.location.origin}/student/${student.id}`;
+                    navigator.clipboard.writeText(link);
+                    alert("تم نسخ رابط بوابة ولي الأمر بنجاح!");
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-xs font-bold text-white border border-white/20"
+                  title="نسخ رابط بوابة ولي الأمر"
+                >
+                  <LinkIcon className="w-4 h-4" />
+                  رابط الولي
+                </button>
                 <Link
                   href={`/app/students/${student.id}/report`}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 transition-colors text-xs font-bold text-white"
@@ -262,12 +281,60 @@ export default function StudentProfilePage() {
               <InfoItem label="المستوى الدراسي" value={student.educationalLevel} icon={BookOpen} />
               <InfoItem label="كمية التحفيظ اليومي" value={student.dailyMemorizationAmount} icon={BookCheck} />
               <InfoItem label="تاريخ التسجيل" value={student.registrationDate ? new Date(student.registrationDate).toLocaleDateString("ar-DZ") : undefined} icon={Calendar} />
-              {student.notes && (
-                <div>
-                  <p className="text-xs text-gray-400 font-medium mb-1">ملاحظات</p>
-                  <p className="text-sm text-gray-700 bg-gray-50 rounded-xl p-3 leading-relaxed">{student.notes}</p>
-                </div>
-              )}
+              <h3 className="font-black text-sm text-gray-500 uppercase tracking-widest mt-6 border-t border-gray-100 pt-5">ملاحظة موجهة لولي الأمر</h3>
+              <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100">
+                {!editingNote ? (
+                  <div>
+                    <p className="text-sm text-gray-700 leading-relaxed font-medium mb-3">
+                      {student.notes || "لا توجد ملاحظة مسجلة حالياً."}
+                    </p>
+                    <button
+                      onClick={() => { setTempNote(student.notes || ""); setEditingNote(true); }}
+                      className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      {student.notes ? "تعديل الملاحظة" : "إضافة ملاحظة لولي الأمر"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <textarea
+                      value={tempNote}
+                      onChange={(e) => setTempNote(e.target.value)}
+                      placeholder="اكتب ملاحظة لولي أمر الطالب..."
+                      className="w-full h-24 rounded-lg border border-blue-200 bg-white p-3 text-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all resize-none"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={async () => {
+                          setSavingNote(true);
+                          try {
+                            const db = getDB();
+                            await db.students.update(student.id, { notes: tempNote });
+                            setStudent({ ...student, notes: tempNote });
+                            setEditingNote(false);
+                          } catch (e) {
+                            console.error(e);
+                          } finally {
+                            setSavingNote(false);
+                          }
+                        }}
+                        disabled={savingNote}
+                        className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors disabled:opacity-50"
+                      >
+                        {savingNote ? <div className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin"/> : <Save className="w-3.5 h-3.5" />}
+                        تحديث الملاحظة
+                      </button>
+                      <button
+                        onClick={() => setEditingNote(false)}
+                        className="text-xs font-bold text-gray-500 hover:text-gray-700 px-3 py-2"
+                      >
+                        إلغاء
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* ولي الأمر */}
@@ -401,7 +468,52 @@ export default function StudentProfilePage() {
         {/* ─── التحليلات ──────────────────────────────────── */}
         {activeTab === "analytics" && (
           <div className="space-y-4">
-            <MemorizationChart studentId={student.id} sessions={sessions} />
+            <div className="flex gap-2 bg-gray-100 p-1.5 rounded-xl mb-4 w-fit mx-auto sm:mx-0">
+              <button
+                onClick={() => setAnalyticsView("velocity")}
+                className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors ${analyticsView === "velocity" ? "bg-white text-[var(--color-primary)] shadow-sm" : "text-gray-500 hover:bg-white/50"}`}
+              >
+                سرعة الحفظ
+              </button>
+              <button
+                onClick={() => setAnalyticsView("radar")}
+                className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors ${analyticsView === "radar" ? "bg-white text-[var(--color-primary)] shadow-sm" : "text-gray-500 hover:bg-white/50"}`}
+              >
+                تحليل التوجهات (رادار)
+              </button>
+              <button
+                onClick={() => setAnalyticsView("heatmap")}
+                className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors ${analyticsView === "heatmap" ? "bg-white text-[var(--color-primary)] shadow-sm" : "text-gray-500 hover:bg-white/50"}`}
+              >
+                الخريطة الحرارية
+              </button>
+            </div>
+
+            {analyticsView === "velocity" && (
+              <MemorizationChart studentId={student.id} sessions={sessions} />
+            )}
+            
+            {analyticsView === "radar" && (
+              <div className="bg-white rounded-2xl border border-[var(--color-border)] p-8 text-center flex flex-col items-center">
+                <TargetIcon className="w-12 h-12 text-gray-200 mb-3" />
+                <h3 className="font-bold text-gray-600 mb-1">تحليل التوجهات (رادار)</h3>
+                <p className="text-xs text-gray-400 mb-6">قريباً: تحليل تقييم الحفظ، الحضور، والسلوك في فترات زمنية محددة.</p>
+                
+                <div className="flex gap-2 flex-wrap justify-center pointer-events-none opacity-50">
+                   <span className="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg text-xs font-medium border border-gray-200">الربع الأول</span>
+                   <span className="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg text-xs font-medium border border-gray-200">الربع الثاني</span>
+                   <span className="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg text-xs font-medium border border-gray-200">هذا العام</span>
+                </div>
+              </div>
+            )}
+            
+            {analyticsView === "heatmap" && (
+              <div className="bg-white rounded-2xl border border-[var(--color-border)] p-8 text-center flex flex-col items-center">
+                <Calendar className="w-12 h-12 text-gray-200 mb-3" />
+                <h3 className="font-bold text-gray-600 mb-1">الخريطة الحرارية للنشاط</h3>
+                <p className="text-xs text-gray-400 mb-6">يتم دمجها من المكونات البصرية القديمة قريباً.</p>
+              </div>
+            )}
           </div>
         )}
       </motion.div>

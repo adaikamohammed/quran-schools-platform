@@ -61,7 +61,13 @@ function StudentHistoryPage() {
     setStudents(studs);
 
     if (studs.length > 0 && !selectedStudentId) {
-      setSelectedStudentId(studs[0].id);
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlStudentId = urlParams.get("studentId");
+      if (urlStudentId && studs.find(s => s.id === urlStudentId)) {
+        setSelectedStudentId(urlStudentId);
+      } else {
+        setSelectedStudentId(studs[0].id);
+      }
     }
     setLoading(false);
   }, [user?.id, school?.id, isPrincipal, selectedTeacherId, selectedStudentId]);
@@ -405,6 +411,11 @@ function StudentHistoryPage() {
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm font-bold text-gray-500">
                 <span className="flex items-center gap-1"><Users className="w-4 h-4"/> الفوج: {selectedStudent.groupName}</span>
                 <span className="flex items-center gap-1"><CheckCircle className="w-4 h-4"/> الحالة: <span className="text-emerald-600">{selectedStudent.status}</span></span>
+                {selectedStudent.parentPhone && (
+                  <a href={`https://wa.me/${selectedStudent.parentPhone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[var(--color-primary)] hover:underline">
+                    <Star className="w-4 h-4 shadow-none text-[var(--color-primary)]"/> رقم الولي: {selectedStudent.parentPhone}
+                  </a>
+                )}
               </div>
             </div>
           </div>

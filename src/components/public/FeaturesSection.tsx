@@ -16,85 +16,36 @@ import {
 
 const features = [
   {
-    icon: Users,
-    title: "إدارة الطلاب",
-    description:
-      "سجّل طلابك، تابع بياناتهم الكاملة، وأدِر معلومات الأولياء في واجهة سهلة وسريعة.",
-    color: "from-emerald-400 to-emerald-600",
-    bg: "bg-emerald-50",
-    text: "text-emerald-700",
-  },
-  {
     icon: BookOpen,
-    title: "تتبّع الحفظ",
-    description:
-      "سجّل تقدم كل طالب في حفظ القرآن الكريم سورة بسورة، مع تقييم دقيق لكل جلسة.",
+    title: "متابعة دقيقة للحفظ والتسميع",
+    description: "تتبع مسار كل طالب بدقة فائقة: السور، الأخطاء، والتقدم اليومي، مما يتيح للمعلم تقييم أداء الحلقات بضغطة زر.",
     color: "from-amber-400 to-amber-600",
     bg: "bg-amber-50",
     text: "text-amber-700",
   },
   {
-    icon: BarChart3,
-    title: "تقارير وإحصائيات",
-    description:
-      "اطّلع على تقارير شاملة عن أداء الطلاب والمعلمين والحلقات بصريًا ومفصّلًا.",
-    color: "from-blue-400 to-blue-600",
-    bg: "bg-blue-50",
-    text: "text-blue-700",
+    icon: Users,
+    title: "إدارة متكاملة للسجلات",
+    description: "تخلص من الورق نهائياً؛ سجلات الطلاب، درجاتهم، ومعلومات أوليائهم كلها منظمة ومتاحة للبحث والوصول الفوري.",
+    color: "from-emerald-400 to-emerald-600",
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
   },
   {
     icon: Bell,
-    title: "تواصل مع الأولياء",
-    description:
-      "أرسل إشعارات وتقارير مباشرة لأولياء الأمور حول أداء أبنائهم ومواعيد الحلقات.",
+    title: "تواصل مباشر مع الأولياء",
+    description: "ربط ولي الأمر بحلقة ابنه عبر النظام، ليصله تقدم مستوى الحفظ وأي ملاحظات من المعلم بوضوح وشفافية.",
     color: "from-purple-400 to-purple-600",
     bg: "bg-purple-50",
     text: "text-purple-700",
   },
   {
-    icon: Calendar,
-    title: "جداول الحلقات",
-    description:
-      "نظّم جداول الحلقات والمعلمين بشكل احترافي، وتجنّب أي تعارض في المواعيد.",
-    color: "from-pink-400 to-pink-600",
-    bg: "bg-pink-50",
-    text: "text-pink-700",
-  },
-  {
-    icon: Trophy,
-    title: "مسابقات وتحفيز",
-    description:
-      "أطلق مسابقات حفظ داخلية، امنح شهادات وجوائز افتراضية للطلاب المتميزين.",
-    color: "from-orange-400 to-orange-600",
-    bg: "bg-orange-50",
-    text: "text-orange-700",
-  },
-  {
-    icon: FileText,
-    title: "الشهادات والوثائق",
-    description:
-      "اطبع شهادات الحفظ وتقارير الأداء بشكل احترافي جاهز للتوزيع الفوري.",
-    color: "from-teal-400 to-teal-600",
-    bg: "bg-teal-50",
-    text: "text-teal-700",
-  },
-  {
-    icon: Shield,
-    title: "أمان وصلاحيات",
-    description:
-      "نظام صلاحيات متعدد المستويات: مدير، معلم، ولي أمر — كل شخص يرى ما يخصّه.",
-    color: "from-slate-400 to-slate-600",
-    bg: "bg-slate-50",
-    text: "text-slate-700",
-  },
-  {
-    icon: Smartphone,
-    title: "متوافق مع الجوّال",
-    description:
-      "استخدم المنصة من أي جهاز — هاتف، حاسوب لوحي، أو جهاز مكتبي — بنفس الكفاءة.",
-    color: "from-cyan-400 to-cyan-600",
-    bg: "bg-cyan-50",
-    text: "text-cyan-700",
+    icon: BarChart3,
+    title: "إحصائيات تُظهر الأداء الفعلي",
+    description: "لوحة تحكم ذكية تلخص لك أداء المدرسة، لمعرفة أنشط الحلقات ومستوى تطور الطلاب بشكل مرئي وسهل القراءة.",
+    color: "from-blue-400 to-blue-600",
+    bg: "bg-blue-50",
+    text: "text-blue-700",
   },
 ];
 
@@ -122,17 +73,16 @@ export default function FeaturesSection() {
             className="text-4xl lg:text-5xl font-black text-gray-900 mt-4 mb-5"
             style={{ fontFamily: "var(--font-headline)" }}
           >
-            ميزات{" "}
-            <span className="text-[var(--color-primary)]">تُغنيك عن كل الأدوات</span>
+            نُركّز على ما يهمّ{" "}
+            <span className="text-[var(--color-primary)]">المدرسة القرآنية</span>
           </h2>
           <p className="text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">
-            منصتنا مُصمّمة خصيصاً لاحتياجات المدارس القرآنية العربية، بواجهة
-            عربية بالكامل وأدوات مخصصة للتعليم القرآني.
+            استغنينا عن التعقيد وركزنا على الأدوات الأساسية التي تصنع الفارق الحقيقي في التسيير اليومي لمتابعة الحلقات وحفظة كتاب الله.
           </p>
         </motion.div>
 
         {/* Features Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-5xl mx-auto">
           {features.map((feature, i) => (
             <motion.div
               key={i}

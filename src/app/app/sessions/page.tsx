@@ -1382,16 +1382,34 @@ function SessionsPage() {
                     </div>
 
                     {inputMode === "classic" && (
-                      <button
-                        onClick={() => setQuickMode(q => !q)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all border ${
-                          quickMode
-                            ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm"
-                            : "bg-white text-gray-600 border-gray-200 hover:border-[var(--color-primary)]/30"
-                        }`}
-                      >
-                        {quickMode ? "وضع مكثف ✓" : "وضع مكثف (حضور فقط)"}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {/* زر تأكيد حضور الجميع */}
+                        <button
+                          onClick={() => {
+                            setRecords(prev => prev.map(r =>
+                              r.attendance === "" || r.attendance === "غائب"
+                                ? { ...r, attendance: "حاضر", memorization: r.memorization || "لم يحفظ" }
+                                : r
+                            ));
+                            setSaved(false);
+                            play("tick");
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all border bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                          title="تعيين جميع الطلاب كحاضرين بنقرة واحدة"
+                        >
+                          ✓ حضور الجميع
+                        </button>
+                        <button
+                          onClick={() => setQuickMode(q => !q)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all border ${
+                            quickMode
+                              ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm"
+                              : "bg-white text-gray-600 border-gray-200 hover:border-[var(--color-primary)]/30"
+                          }`}
+                        >
+                          {quickMode ? "وضع مكثف ✓" : "وضع مكثف (حضور فقط)"}
+                        </button>
+                      </div>
                     )}
                   </div>
 
