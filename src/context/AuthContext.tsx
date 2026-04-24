@@ -57,7 +57,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function loadSession() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("Auth session error:", sessionError);
+          // If the refresh token is invalid, clear the corrupted session
+          if (sessionError.message?.includes("Refresh Token Not Found") || sessionError.name === "AuthApiError") {
+            await supabase.auth.signOut();
+            await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+          }
+        }
+
         if (!session) {
           if (mounted) {
             setUser(null);
@@ -67,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const { data: userData } = await supabase
+        const { data: userData, error: userError } = await supabase
           .from("users")
           .select("*")
           .eq("id", session.user.id)

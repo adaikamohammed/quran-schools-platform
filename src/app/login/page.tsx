@@ -93,7 +93,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right panel - Login form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center relative z-10 p-6">
+      <div className="w-full lg:w-1/2 flex items-center justify-center relative z-10 p-4 sm:p-6">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -110,7 +110,7 @@ export default function LoginPage() {
             </p>
           </Link>
 
-          <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-2xl">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-100 shadow-2xl">
             <div className="mb-8">
               <h2
                 className="text-2xl font-black text-gray-900 mb-2"

@@ -212,10 +212,11 @@ export default function RegisterPage() {
       <div style={styles.bgCircle2} />
       <div style={styles.bgCircle3} />
 
-      <div style={styles.container}>
+      <div id="register-container" style={styles.container}>
 
         {/* ─── الجانب الأيمن — معلومات ──────────── */}
         <motion.div
+          id="left-panel"
           initial={{ opacity: 0, x: 40 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6 }}
@@ -264,6 +265,7 @@ export default function RegisterPage() {
 
         {/* ─── نموذج التسجيل ────────────────────── */}
         <motion.div
+          id="form-wrapper"
           initial={{ opacity: 0, y: 32 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, delay: 0.1 }}
@@ -304,7 +306,7 @@ export default function RegisterPage() {
                   required
                 />
 
-                <div style={styles.row}>
+                <div className="row-responsive" style={styles.row}>
                   <div style={{ flex: 1, position: "relative" }}>
                     <div style={styles.inputIcon}><Globe size={18} color="#6b7280" /></div>
                     <select
@@ -341,7 +343,7 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                <div style={styles.row}>
+                <div className="row-responsive" style={styles.row}>
                   <div style={{ flex: 1, position: "relative" }}>
                     <div style={styles.inputIcon}><BookOpen size={18} color="#6b7280" /></div>
                     <select
@@ -533,6 +535,7 @@ export default function RegisterPage() {
           #register-container { flex-direction: column !important; gap: 0 !important; }
           #left-panel { display: none !important; }
           #form-wrapper { width: 100% !important; max-width: 100% !important; min-height: 100vh; padding: 24px 16px !important; }
+          .row-responsive { flex-direction: column !important; gap: 16px !important; }
         }
       `}</style>
     </div>
