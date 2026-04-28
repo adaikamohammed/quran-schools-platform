@@ -8,6 +8,7 @@ const withSerwist = withSerwistInit({
 });
 
 const nextConfig = {
+  output: "standalone",
   turbopack: {}, // Required in Next.js 16+ to acknowledge Turbopack alongside webpack configs
   typescript: {
     ignoreBuildErrors: true, // لا توقف البناء بسبب أخطاء TypeScript

@@ -1,0 +1,386 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model School {
+  id                String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name              String
+  city              String    @default("")
+  country           String    @default("")
+  owner_id          String?   @db.Uuid
+  plan              String    @default("free")
+  is_active         Boolean   @default(true)
+  director_name     String?
+  email             String?
+  phone             String?
+  logo_url          String?
+  season_start_date String?
+  settings          Json      @default("{}")
+  created_at        DateTime? @default(now()) @db.Timestamptz
+  updated_at        DateTime? @default(now()) @db.Timestamptz
+  deleted_at        DateTime? @db.Timestamptz
+
+  users                User[]
+  students             Student[]
+  daily_sessions       DailySession[]
+  surah_progresses     SurahProgress[]
+  payments             Payment[]
+  pre_registrations    PreRegistration[]
+  daily_reports        DailyReport[]
+  meetings             Meeting[]
+  system_notifications SystemNotification[]
+
+  @@map("schools")
+}
+
+model User {
+  id             String    @id @db.Uuid // Matches auth.users id
+  school_id      String?   @db.Uuid
+  email          String    @unique
+  display_name   String
+  role           String
+  photo_url      String?
+  phone          String?
+  gender         String?
+  join_date      String?
+  is_active      Boolean?  @default(true)
+  group_name     String?
+  bio            String?
+  certifications String?
+  student_ids    String[]
+  created_at     DateTime? @default(now()) @db.Timestamptz
+  updated_at     DateTime? @default(now()) @db.Timestamptz
+  deleted_at     DateTime? @db.Timestamptz
+  
+  // Custom auth fields (we'll add these since we're replacing Supabase Auth)
+  password_hash  String?
+
+  school School? @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  teacher_students     Student[]          @relation("StudentTeacher")
+  from_transfers       TransferRecord[]   @relation("FromTeacher")
+  to_transfers         TransferRecord[]   @relation("ToTeacher")
+  daily_sessions       DailySession[]
+  daily_reports        DailyReport[]      @relation("ReportTeacher")
+  received_reports     DailyReport[]      @relation("ReportRecipient")
+  sent_notifications   SystemNotification[] @relation("NotificationSender")
+  approved_registrations PreRegistration[]  @relation("RegistrationApprover")
+  reviewed_requests    SchoolRequest[]    @relation("RequestReviewer")
+
+  @@map("users")
+}
+
+model Student {
+  id                        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id                 String?   @db.Uuid
+  teacher_id                String?   @db.Uuid
+  group_name                String    @default("")
+  full_name                 String
+  gender                    String    @default("")
+  birth_date                String    @default("")
+  educational_level         String?
+  guardian_name             String    @default("")
+  phone1                    String    @default("")
+  phone2                    String?
+  photo_url                 String?
+  registration_date         String    @default("")
+  status                    String    @default("active")
+  subscription_tier         String    @default("basic")
+  memorized_surahs_count    Int?      @default(0)
+  daily_memorization_amount String    @default("")
+  page_number               String?
+  notes                     String?
+  action_reason             String?
+  created_at                DateTime? @default(now()) @db.Timestamptz
+  updated_at                DateTime? @default(now()) @db.Timestamptz
+  deleted_at                DateTime? @db.Timestamptz
+
+  school  School? @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  teacher User?   @relation("StudentTeacher", fields: [teacher_id], references: [id], onDelete: SetNull)
+
+  covenants         Covenant[]
+  expulsion_records ExpulsionRecord[]
+  transfer_records  TransferRecord[]
+  daily_records     DailyRecord[]
+  surah_progresses  SurahProgress[]
+  payments          Payment[]
+
+  @@map("students")
+}
+
+model Covenant {
+  id                    String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  student_id            String?   @db.Uuid
+  type                  String
+  text                  String
+  status                String
+  card                  String
+  date                  String
+  absence_days          Int?
+  written_penalty       String?
+  due_date              String?
+  compensation_sessions Int?
+  compensation_date     String?
+  is_compensated        Boolean?
+  created_at            DateTime? @default(now()) @db.Timestamptz
+  updated_at            DateTime? @default(now()) @db.Timestamptz
+  deleted_at            DateTime? @db.Timestamptz
+
+  student Student? @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@map("covenants")
+}
+
+model ExpulsionRecord {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  student_id String?   @db.Uuid
+  date       String
+  reason     String
+  created_at DateTime? @default(now()) @db.Timestamptz
+  deleted_at DateTime? @db.Timestamptz
+
+  student Student? @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@map("expulsion_records")
+}
+
+model TransferRecord {
+  id                String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  student_id        String?   @db.Uuid
+  date              String
+  from_teacher_id   String?   @db.Uuid
+  from_teacher_name String?
+  from_group_name   String
+  to_teacher_id     String?   @db.Uuid
+  to_teacher_name   String?
+  to_group_name     String
+  reason            String
+  created_at        DateTime? @default(now()) @db.Timestamptz
+  deleted_at        DateTime? @db.Timestamptz
+
+  student      Student? @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  from_teacher User?    @relation("FromTeacher", fields: [from_teacher_id], references: [id], onDelete: SetNull)
+  to_teacher   User?    @relation("ToTeacher", fields: [to_teacher_id], references: [id], onDelete: SetNull)
+
+  @@map("transfer_records")
+}
+
+model DailySession {
+  id                     String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id              String?   @db.Uuid
+  teacher_id             String?   @db.Uuid
+  date                   String
+  session_number         Int
+  session_type           String
+  teacher_absence_reason String?
+  substitute_teacher     String?
+  activity_type          String?
+  activity_description   String?
+  surah_id               Int?
+  from_verse             Int?
+  to_verse               Int?
+  is_review              Boolean?
+  created_at             DateTime? @default(now()) @db.Timestamptz
+  updated_at             DateTime? @default(now()) @db.Timestamptz
+  deleted_at             DateTime? @db.Timestamptz
+
+  school  School? @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  teacher User?   @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
+
+  daily_records DailyRecord[]
+
+  @@unique([date, session_number, teacher_id, school_id])
+  @@map("daily_sessions")
+}
+
+model DailyRecord {
+  id                String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  session_id        String?   @db.Uuid
+  student_id        String?   @db.Uuid
+  attendance        String
+  memorization      String?
+  surah_id          Int?
+  from_verse        Int?
+  to_verse          Int?
+  review            Boolean?
+  behavior          String?
+  notes             String?
+  talqin_surah_id   Int?
+  talqin_from_verse Int?
+  talqin_to_verse   Int?
+  tasmie_surah_id   Int?
+  tasmie_from_verse Int?
+  tasmie_to_verse   Int?
+  created_at        DateTime? @default(now()) @db.Timestamptz
+  updated_at        DateTime? @default(now()) @db.Timestamptz
+  deleted_at        DateTime? @db.Timestamptz
+
+  session DailySession? @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  student Student?      @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@unique([session_id, student_id])
+  @@map("daily_records")
+}
+
+model SurahProgress {
+  id              String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  student_id      String?   @db.Uuid
+  school_id       String?   @db.Uuid
+  surah_id        Int
+  surah_name      String
+  status          String
+  from_verse      Int?
+  to_verse        Int?
+  total_verses    Int?
+  start_date      String?
+  completion_date String?
+  retake_count    Int?      @default(0)
+  notes           String?
+  created_at      DateTime? @default(now()) @db.Timestamptz
+  updated_at      DateTime? @default(now()) @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+
+  student Student? @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  school  School?  @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@map("surah_progresses")
+}
+
+model Payment {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id  String?   @db.Uuid
+  student_id String?   @db.Uuid
+  amount     Decimal   @db.Decimal
+  date       String
+  status     String
+  paid_at    String?
+  notes      String?
+  created_at DateTime? @default(now()) @db.Timestamptz
+  updated_at DateTime? @default(now()) @db.Timestamptz
+  deleted_at DateTime? @db.Timestamptz
+
+  school  School?  @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student Student? @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model PreRegistration {
+  id                String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id         String?   @db.Uuid
+  requested_at      String
+  full_name         String
+  gender            String
+  birth_date        String    @default("")
+  educational_level String?
+  guardian_name     String?
+  phone1            String
+  phone2            String?
+  address           String?
+  status            String
+  notes             String?
+  photo_url         String?
+  approved_by_id    String?   @db.Uuid
+  created_at        DateTime? @default(now()) @db.Timestamptz
+  updated_at        DateTime? @default(now()) @db.Timestamptz
+  deleted_at        DateTime? @db.Timestamptz
+
+  school      School? @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  approved_by User?   @relation("RegistrationApprover", fields: [approved_by_id], references: [id], onDelete: SetNull)
+
+  @@map("pre_registrations")
+}
+
+model DailyReport {
+  id                    String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id             String?   @db.Uuid
+  teacher_id            String?   @db.Uuid
+  date                  String
+  note                  String
+  timestamp             String
+  author_name           String
+  category              String
+  status                String
+  admin_notes           String?
+  is_pinned             Boolean?  @default(false)
+  priority              String?
+  has_new_reply         Boolean?  @default(false)
+  is_management_message Boolean?  @default(false)
+  recipient_id          String?   @db.Uuid
+  is_read_by_recipient  Boolean?
+  created_at            DateTime? @default(now()) @db.Timestamptz
+  updated_at            DateTime? @default(now()) @db.Timestamptz
+  deleted_at            DateTime? @db.Timestamptz
+
+  school    School? @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  teacher   User?   @relation("ReportTeacher", fields: [teacher_id], references: [id], onDelete: Cascade)
+  recipient User?   @relation("ReportRecipient", fields: [recipient_id], references: [id], onDelete: SetNull)
+
+  @@map("daily_reports")
+}
+
+model Meeting {
+  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id     String?   @db.Uuid
+  title         String
+  date          String
+  timestamp     String
+  attendance    Json      @default("[]")
+  food_provided Boolean?  @default(false)
+  food_details  String?
+  topics        Json      @default("[]")
+  status        String
+  created_by    String
+  created_at    DateTime? @default(now()) @db.Timestamptz
+  updated_at    DateTime? @default(now()) @db.Timestamptz
+  deleted_at    DateTime? @db.Timestamptz
+
+  school School? @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@map("meetings")
+}
+
+model SystemNotification {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_id   String?   @db.Uuid
+  sender_id   String?   @db.Uuid
+  sender_name String
+  type        String
+  title       String
+  message     String
+  image_url   String?
+  target_type String
+  target_ids  Json?     @default("[]")
+  created_at  DateTime? @default(now()) @db.Timestamptz
+  updated_at  DateTime? @default(now()) @db.Timestamptz
+
+  school School? @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  sender User?   @relation("NotificationSender", fields: [sender_id], references: [id], onDelete: Cascade)
+
+  @@map("system_notifications")
+}
+
+model SchoolRequest {
+  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  school_name   String
+  city          String    @default("")
+  country       String    @default("")
+  director_name String
+  email         String
+  phone         String    @default("")
+  notes         String?
+  status        String    @default("pending")
+  reviewed_by   String?   @db.Uuid
+  reviewed_at   DateTime? @db.Timestamptz
+  created_at    DateTime? @default(now()) @db.Timestamptz
+  updated_at    DateTime? @default(now()) @db.Timestamptz
+
+  reviewer User? @relation("RequestReviewer", fields: [reviewed_by], references: [id], onDelete: SetNull)
+
+  @@map("school_requests")
+}
